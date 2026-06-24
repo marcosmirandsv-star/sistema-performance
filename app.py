@@ -48,6 +48,19 @@ def init_supabase():
     
     return None
 
+def testar_supabase():
+    """Testa a conexão com o Supabase"""
+    try:
+        supabase = init_supabase()
+        if not supabase:
+            return False, "Supabase não configurado (credenciais não encontradas)"
+        
+        # Tenta fazer uma consulta simples
+        response = supabase.table('historico_performance').select('*').limit(1).execute()
+        return True, "✅ Conexão com Supabase OK!"
+    except Exception as e:
+        return False, f"❌ Erro de conexão: {str(e)}"
+
 def salvar_historico(supabase, dados, mes_ano, gestor):
     """Salva os dados processados no Supabase"""
     if not supabase:
