@@ -165,7 +165,6 @@ def carregar_usuarios():
     except:
         pass
     
-    # Usuários padrão
     usuarios = {
         "marcos": {
             "senha": hash_senha("marcos2026"),
@@ -520,6 +519,220 @@ def calcular_podio(resultados, gestor=None, media_atendimentos=None, limiar_csat
     return [(nome, dados['csat'], dados['total_atendimentos'], dados['perc_avaliacoes']) for nome, dados in top_3]
 
 # ============================================
+# FUNÇÕES DE VISUALIZAÇÃO - PAINEL DO ANALISTA
+# ============================================
+
+def criar_painel_analista(analista, dados, media_operacao, podio):
+    """Cria o painel visual do analista com métricas e gráficos"""
+    
+    # Verificar se o analista está no pódio
+    posicao_podio = None
+    for i, (nome, _, _, _) in enumerate(podio, 1):
+        if nome == analista:
+            posicao_podio = i
+            break
+    
+    # ===== MÉTRICAS EM CARDS =====
+    st.subheader(f"📊 Painel de Performance - {analista}")
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    # Card 1: CSAT
+    with col1:
+        delta_csat = dados['delta_csat']
+        cor_delta = "green" if delta_csat >= 0 else "red"
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};">
+            <p style="font-size: 12px; color: #666; margin: 0;">⭐ CSAT</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};">{dados['csat']:.1f}%</p>
+            <p style="font-size: 12px; color: #666; margin: 0;">Meta: {dados['meta_csat']}%</p>
+            <p style="font-size: 14px; color: {cor_delta}; margin: 0;">{delta_csat:+.1f}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Card 2: % Avaliações
+    with col2:
+        diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
+        cor_diff = "green" if diff_avaliacoes >= 0 else "red"
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};">
+            <p style="font-size: 12px; color: #666; margin: 0;">📊 % Avaliações</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};">{dados['perc_avaliacoes']:.1f}%</p>
+            <p style="font-size: 12px; color: #666; margin: 0;">Meta: {dados['meta_geral']}%</p>
+            <p style="font-size: 14px; color: {cor_diff}; margin: 0;">{diff_avaliacoes:+.1f}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Card 3: % Envio
+    with col3:
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #17a2b8;">
+            <p style="font-size: 12px; color: #666; margin: 0;">📤 % Envio</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: #17a2b8;">{dados['perc_envio']:.1f}%</p>
+            <p style="font-size: 12px; color: #666; margin: 0;">Clientes não avaliaram</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Card 4: Atendimentos
+    with col4:
+        diff_atend = dados['total_atendimentos'] - media_operacao
+        cor_atend = "green" if diff_atend >= 0 else "red"
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #6c757d;">
+            <p style="font-size: 12px; color: #666; margin: 0;">💬 Atendimentos</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: #6c757d;">{dados['total_atendimentos']}</p>
+            <p style="font-size: 12px; color: #666; margin: 0;">Média: {media_operacao}</p>
+            <p style="font-size: 14px; color: {cor_atend}; margin: 0;">{diff_atend:+.0f}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Card 5: Posição no Ranking
+    with col5:
+        if posicao_podio:
+            medalha = ["🥇", "🥈", "🥉"][posicao_podio-1]
+            cor_podio = ['#FFD700', '#C0C0C0', '#CD7F32'][posicao_podio-1]
+            st.markdown(f"""
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {cor_podio};">
+                <p style="font-size: 12px; color: #666; margin: 0;">🏆 Ranking</p>
+                <p style="font-size: 40px; margin: 0;">{medalha}</p>
+                <p style="font-size: 16px; font-weight: bold; margin: 5px 0; color: {cor_podio};">{posicao_podio}º Lugar</p>
+                <p style="font-size: 12px; color: #666; margin: 0;">Pódio do Mês</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #6c757d;">
+                <p style="font-size: 12px; color: #666; margin: 0;">🏆 Ranking</p>
+                <p style="font-size: 28px; margin: 5px 0;">📋</p>
+                <p style="font-size: 14px; font-weight: bold; margin: 5px 0; color: #6c757d;">Não está no pódio</p>
+                <p style="font-size: 12px; color: #666; margin: 0;">Meta: CSAT ≥ 90%</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ===== GRÁFICOS DO ANALISTA =====
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Gráfico de Barras - CSAT vs Meta
+        fig_barras = go.Figure()
+        
+        # Barra do CSAT Alcançado
+        fig_barras.add_trace(go.Bar(
+            x=['CSAT'],
+            y=[dados['csat']],
+            name='Alcançado',
+            marker_color='#2ecc71',
+            text=[f"{dados['csat']:.1f}%"],
+            textposition='outside'
+        ))
+        
+        # Barra da Meta
+        fig_barras.add_trace(go.Bar(
+            x=['CSAT'],
+            y=[dados['meta_csat']],
+            name='Meta',
+            marker_color='#e74c3c',
+            text=[f"{dados['meta_csat']}%"],
+            textposition='outside'
+        ))
+        
+        fig_barras.update_layout(
+            title='CSAT - Resultado vs Meta',
+            yaxis_title='Percentual (%)',
+            yaxis_range=[0, 100],
+            height=350,
+            showlegend=True,
+            legend=dict(orientation='h', yanchor='bottom', y=1.02)
+        )
+        st.plotly_chart(fig_barras, use_container_width=True)
+        
+        # Gráfico de Gauge (velocímetro) para CSAT
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number+delta",
+            value=dados['csat'],
+            delta={'reference': dados['meta_csat']},
+            title={'text': "CSAT"},
+            gauge={
+                'axis': {'range': [None, 100]},
+                'bar': {'color': "#2ecc71" if dados['csat'] >= dados['meta_csat'] else "#e74c3c"},
+                'steps': [
+                    {'range': [0, dados['meta_csat']], 'color': "rgba(231, 76, 60, 0.3)"},
+                    {'range': [dados['meta_csat'], 100], 'color': "rgba(46, 204, 113, 0.3)"}
+                ],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': dados['meta_csat']
+                }
+            }
+        ))
+        fig_gauge.update_layout(height=250)
+        st.plotly_chart(fig_gauge, use_container_width=True)
+    
+    with col2:
+        # Gráfico de Radar
+        categorias = ['CSAT', '% Avaliações', '% Envio', 'Atendimentos']
+        
+        # Normalizar valores para o radar (0-100)
+        csat_norm = dados['csat']
+        avaliacoes_norm = dados['perc_avaliacoes']
+        envio_norm = dados['perc_envio']
+        
+        # Atendimentos normalizado (baseado na média)
+        if media_operacao > 0:
+            atend_norm = min(100, (dados['total_atendimentos'] / media_operacao) * 100)
+        else:
+            atend_norm = 0
+        
+        # Valores do analista
+        valores_analista = [csat_norm, avaliacoes_norm, envio_norm, atend_norm]
+        
+        # Valores da meta (referência)
+        valores_meta = [dados['meta_csat'], dados['meta_geral'], 50, 100]  # 50% é referência para envio, 100% para atendimentos
+        
+        fig_radar = go.Figure()
+        
+        fig_radar.add_trace(go.Scatterpolar(
+            r=valores_analista,
+            theta=categorias,
+            fill='toself',
+            name=analista,
+            line_color='#2ecc71',
+            fillcolor='rgba(46, 204, 113, 0.3)'
+        ))
+        
+        fig_radar.add_trace(go.Scatterpolar(
+            r=valores_meta,
+            theta=categorias,
+            fill='toself',
+            name='Meta',
+            line_color='#e74c3c',
+            fillcolor='rgba(231, 76, 60, 0.1)',
+            line_dash='dash'
+        ))
+        
+        fig_radar.update_layout(
+            title='Radar de Performance',
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 100]
+                )
+            ),
+            height=400,
+            showlegend=True,
+            legend=dict(orientation='h', yanchor='bottom', y=1.02)
+        )
+        st.plotly_chart(fig_radar, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # ===== GRÁFICO DE EVOLUÇÃO (se houver mais de 1 mês) =====
+    return posicao_podio
+
+# ============================================
 # GERAÇÃO DE FEEDBACK COM IA
 # ============================================
 
@@ -730,7 +943,7 @@ superar os desafios e celebrar as conquistas! 🚀
 # ============================================
 
 def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
-    """Gera gráfico mensal de evolução do analista"""
+    """Gera gráfico mensal de evolução do analista (apenas se tiver 2+ meses)"""
     
     if dados_mensais is None or dados_mensais.empty:
         return None
@@ -738,6 +951,11 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     df_analista = dados_mensais[dados_mensais['analista'] == analista]
     
     if df_analista.empty:
+        return None
+    
+    # Verificar se tem mais de 1 mês
+    meses = df_analista['mes_ano'].nunique()
+    if meses < 2:
         return None
     
     df_analista = df_analista.sort_values('mes_ano')
@@ -1435,12 +1653,10 @@ def main():
         
         # ===== FILTRO POR GESTOR OU ACESSO TOTAL =====
         if st.session_state.get('acesso_total', False):
-            # Acesso Total: mostra todos os times
             gestor_selecionado = None
             resultados_filtrados = resultados
             st.info("🔑 Acesso Total - Visualizando todos os times")
         else:
-            # Acesso normal: mostra apenas o time do gestor
             gestor_selecionado = st.session_state.gestor
             resultados_filtrados = {k: v for k, v in resultados.items() if v['gestor'] == gestor_selecionado}
         
@@ -1494,9 +1710,8 @@ def main():
         # ===== PÓDIO =====
         st.subheader("🏆 Pódio do Mês")
         
-        # Para o pódio, considerar o gestor selecionado ou todos
         if st.session_state.get('acesso_total', False):
-            podio_gestor = None  # Pódio geral
+            podio_gestor = None
         else:
             podio_gestor = st.session_state.gestor
         
@@ -1626,30 +1841,34 @@ def main():
         if analista_selecionado:
             dados = resultados_filtrados[analista_selecionado]
             
-            # ===== RELATÓRIO DE ANÁLISE =====
-            with st.expander("📊 Relatório de Análise", expanded=True):
-                st.subheader(f"📊 Análise de Performance - {analista_selecionado}")
+            # ===== 1. PAINEL VISUAL DO ANALISTA =====
+            posicao_podio = criar_painel_analista(
+                analista_selecionado,
+                dados,
+                media_atendimentos,
+                podio
+            )
+            
+            # ===== 2. GRÁFICO DE EVOLUÇÃO (se houver 2+ meses) =====
+            if supabase:
+                df_historico_analista = carregar_historico(
+                    supabase, 
+                    analista=analista_selecionado
+                )
                 
-                if supabase:
-                    df_historico_analista = carregar_historico(
-                        supabase, 
-                        analista=analista_selecionado
-                    )
-                    
-                    if df_historico_analista is not None and not df_historico_analista.empty:
-                        fig_mensal = gerar_grafico_mensal(
-                            analista_selecionado,
-                            df_historico_analista,
-                            dados['meta_csat'],
-                            dados['meta_geral']
-                        )
-                        if fig_mensal:
-                            st.plotly_chart(fig_mensal, use_container_width=True)
-                    else:
-                        st.info("Dados históricos insuficientes para o gráfico mensal. Processe mais meses para ver a evolução.")
-                else:
-                    st.warning("Supabase não configurado para histórico.")
-                
+                fig_mensal = gerar_grafico_mensal(
+                    analista_selecionado,
+                    df_historico_analista,
+                    dados['meta_csat'],
+                    dados['meta_geral']
+                )
+                if fig_mensal:
+                    st.subheader("📈 Evolução Mensal")
+                    st.plotly_chart(fig_mensal, use_container_width=True)
+                    st.markdown("---")
+            
+            # ===== 3. ANÁLISE TÉCNICA =====
+            with st.expander("📊 Análise Técnica", expanded=True):
                 analise_tecnica = gerar_analise_tecnica(
                     analista_selecionado,
                     dados,
@@ -1658,15 +1877,9 @@ def main():
                 )
                 st.markdown(analise_tecnica)
             
-            # ===== FEEDBACK =====
+            # ===== 4. FEEDBACK DE PERFORMANCE =====
             with st.expander("📝 Feedback de Performance", expanded=True):
                 st.subheader(f"📝 Feedback - {analista_selecionado}")
-                
-                posicao_podio = None
-                for i, (nome, _, _, _) in enumerate(podio, 1):
-                    if nome == analista_selecionado:
-                        posicao_podio = i
-                        break
                 
                 feedback_atual = gerar_feedback_manual(
                     analista_selecionado,
@@ -1715,7 +1928,7 @@ def main():
                 else:
                     feedback = feedback_editado
             
-            # ===== RELATÓRIO COMPLETO =====
+            # ===== 5. RELATÓRIO COMPLETO =====
             with st.expander("📄 Relatório Completo (Visualizar)", expanded=False):
                 relatorio_markdown = f"""
 # {analista_selecionado}
