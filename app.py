@@ -957,6 +957,62 @@ def main():
         st.info("👋 Faça login na barra lateral para acessar o sistema.")
         return
     
+    # ===== TESTE DE CONEXÃO SUPABASE =====
+    with st.expander("🔧 Diagnóstico de Conexão - Supabase", expanded=True):
+        st.subheader("📡 Testando conexão com Supabase...")
+        
+        # Verificar Secrets
+        try:
+            url = st.secrets.get("SUPABASE_URL", "")
+            key = st.secrets.get("SUPABASE_KEY", "")
+            if url and key:
+                st.success(f"✅ SUPABASE_URL encontrada: {url[:20]}...")
+                st.success(f"✅ SUPABASE_KEY encontrada: {key[:10]}...")
+            else:
+                st.error("❌ SUPABASE_URL ou SUPABASE_KEY não encontradas no Secrets!")
+                st.info("Configure em: Settings → Secrets")
+        except:
+            st.error("❌ Secrets não configurados!")
+        
+        # Testar conexão
+        supabase = init_supabase()
+        if supabase:
+            try:
+                # Tenta consultar uma tabela
+                response = supabase.table('historico_performance').select('*').limit(1).execute()
+                st.success("✅ Conexão com Supabase estabelecida com sucesso!")
+                st.info(f"📊 Dados encontrados: {len(response.data)} registros")
+                
+                # Verificar tabelas
+                try:
+                    podio_response = supabase.table('podio_manual').select('*').limit(1).execute()
+                    st.success("✅ Tabela 'podio_manual' encontrada")
+                except:
+                    st.warning("⚠️ Tabela 'podio_manual' não encontrada. Execute o SQL para criar.")
+                
+            except Exception as e:
+                st.error(f"❌ Erro ao conectar: {str(e)}")
+                st.info("""
+                **Possíveis causas:**
+                1. SUPABASE_URL ou SUPABASE_KEY incorretos
+                2. Tabelas não criadas (rode o SQL no Supabase)
+                3. Projeto Supabase em região diferente
+                4. Chave API expirada
+                """)
+        else:
+            st.error("❌ Não foi possível inicializar o Supabase")
+            st.info("""
+            **Configure as credenciais:**
+            1. Vá em Settings → Secrets no Streamlit Cloud
+            2. Adicione:
+               SUPABASE_URL = "https://seu-projeto.supabase.co"
+               SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            3. Clique em Save
+            """)
+    
+    st.markdown("---")
+    
+    # Inicializar Supabase
     supabase = init_supabase()
     if supabase:
         st.sidebar.success("✅ Conectado ao Supabase")
