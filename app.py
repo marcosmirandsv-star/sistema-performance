@@ -6,7 +6,10 @@ from datetime import datetime
 import io
 import json
 import os
-import google.generativeai as genai
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from supabase import create_client, Client
 
 # ============================================
 # CONFIGURAÇÕES INICIAIS
@@ -19,172 +22,198 @@ st.set_page_config(
 )
 
 # ============================================
-# CONFIGURAÇÃO DA GEMINI API
+# SUPABASE CONFIG
 # ============================================
 
-def configurar_gemini():
-    """Configura a API do Gemini"""
+def init_supabase():
+    """Inicializa conexão com Supabase"""
     try:
-        api_key = st.secrets["GEMINI_API_KEY"]
-        genai.configure(api_key=api_key)
-        return True
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        return create_client(url, key)
     except:
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key:
-            genai.configure(api_key=api_key)
-            return True
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
+        if url and key:
+            return create_client(url, key)
+        return None
+
+def salvar_historico(supabase, dados, mes_ano, gestor):
+    """Salva os dados processados no Supabase"""
+    if not supabase:
+        return False
+    
+    try:
+        registros = []
+        for analista, d in dados.items():
+            registros.append({
+                'mes_ano': mes_ano,
+                'analista': analista,
+                'gestor': gestor,
+                'csat': d['csat'],
+                'perc_avaliacoes': d['perc_avaliacoes'],
+                'perc_envio': d['perc_envio'],
+                'total_atendimentos': d['total_atendimentos'],
+                'total_inativos': d['total_inativos'],
+                'validos': d['validos'],
+                'avaliacoes': d['avaliacoes'],
+                'positivos': d['positivos'],
+                'negativos': d['negativos'],
+                'meta_csat': d['meta_csat'],
+                'delta_csat': d['delta_csat'],
+                'meta_geral': d['meta_geral'],
+                'status': d['status']
+            })
+        
+        for registro in registros:
+            supabase.table('historico_performance').insert(registro).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar histórico: {str(e)}")
         return False
 
-def gerar_analise_gemini(analista, dados, media_operacao, podio):
-    """Gera análise técnica usando Gemini API"""
-    
-    if not configurar_gemini():
-        return gerar_analise_tecnica_fallback(analista, dados, media_operacao, podio)
+def carregar_historico(supabase, mes_ano=None, gestor=None):
+    """Carrega histórico do Supabase"""
+    if not supabase:
+        return None
     
     try:
-        podio_texto = ""
-        for i, (nome, csat, atendimentos, perc_envio) in enumerate(podio, 1):
-            podio_texto += f"{i}º: {nome} - CSAT: {csat:.2f}% | {atendimentos} atendimentos | % Envio: {perc_envio:.2f}%\n"
+        query = supabase.table('historico_performance').select('*')
         
-        prompt = f"""
-        Você é um especialista em análise de desempenho de equipes de atendimento ao cliente.
-        Analise os dados do colaborador {analista} e gere uma análise técnica detalhada.
-
-        ## DADOS DO COLABORADOR:
-        - CSAT (Satisfação do Cliente): {dados['csat']:.2f}%
-        - Meta de CSAT: {dados['meta_csat']:.0f}%
-        - Delta CSAT: {dados['delta_csat']:+.2f} pontos percentuais
-        - % de Avaliações: {dados['perc_avaliacoes']:.2f}%
-        - Meta de Avaliações: {dados['meta_geral']:.0f}%
-        - Total de Atendimentos: {dados['total_atendimentos']}
-        - Atendimentos Válidos: {dados['validos']}
-        - Inativos: {dados['total_inativos']}
-        - Total de Avaliações: {dados['avaliacoes']}
-        - Avaliações Positivas: {dados['positivos']}
-        - Avaliações Negativas: {dados['negativos']}
-        - % de Envio de Avaliações: {dados['perc_envio']:.2f}%
-
-        ## DADOS DA OPERAÇÃO:
-        - Média de Atendimentos por Agente: {media_operacao}
-
-        ## PÓDIO DO MÊS (por CSAT, com avaliações ≥ 25%):
-        {podio_texto}
-
-        ## INSTRUÇÕES:
-        Gere uma análise técnica de desempenho seguindo EXATAMENTE esta estrutura:
-
-        ### 1. Qualidade e Satisfação do Cliente (CSAT)
-        - Apresente o índice de CSAT
-        - Compare com a meta e calcule o delta
-        - Analise o volume de avaliações positivas e negativas
-        - Dê uma interpretação qualitativa do resultado
-
-        ### 2. Engajamento e Coleta de Feedback
-        - Apresente a taxa de avaliações
-        - Compare com a meta
-        - Analise a proatividade na coleta de feedback
-        - Mostre o cálculo da taxa
-
-        ### 3. Produtividade e Volumetria
-        - Apresente o volume total de atendimentos
-        - Compare com a média da operação
-        - Destaque a posição no pódio (se aplicável)
-        - Analise a produtividade geral
-
-        ## TOM DE VOZ:
-        - Profissional e objetivo
-        - Use dados numéricos para embasar a análise
-        - Seja construtivo e motivador
-        - Destaque conquistas e oportunidades de melhoria
-        - Use linguagem clara e acessível
-
-        ## FORMATO:
-        - Use markdown para formatação
-        - Destaque números importantes em **negrito**
-        - Mantenha a estrutura com ### para cada seção
-        - Seja conciso, mas completo (máximo 400 palavras)
-
-        Gere a análise agora:
-        """
+        if mes_ano:
+            query = query.eq('mes_ano', mes_ano)
+        if gestor:
+            query = query.eq('gestor', gestor)
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        return response.text.strip()
-        
+        response = query.execute()
+        return pd.DataFrame(response.data)
     except Exception as e:
-        st.warning(f"Erro ao gerar análise com Gemini: {str(e)}. Usando análise padrão.")
-        return gerar_analise_tecnica_fallback(analista, dados, media_operacao, podio)
+        st.error(f"Erro ao carregar histórico: {str(e)}")
+        return None
 
-def gerar_analise_tecnica_fallback(analista, dados, media_operacao, podio):
-    """Análise técnica padrão (fallback sem IA)"""
+def salvar_podio_manual(supabase, mes_ano, gestor, podio):
+    """Salva edição manual do pódio"""
+    if not supabase:
+        return False
     
-    posicao = "não está no pódio"
-    for i, (nome, csat, atendimentos, perc_envio) in enumerate(podio, 1):
-        if nome == analista:
-            posicao = f"está em {i}º lugar no pódio com CSAT de {csat:.2f}%, {atendimentos} atendimentos e {perc_envio:.2f}% de não envio"
-            break
+    try:
+        supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        
+        for i, (nome, csat, atendimentos, _) in enumerate(podio, 1):
+            supabase.table('podio_manual').insert({
+                'mes_ano': mes_ano,
+                'gestor': gestor,
+                'posicao': i,
+                'analista': nome,
+                'csat': csat,
+                'atendimentos': atendimentos
+            }).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar pódio: {str(e)}")
+        return False
+
+def carregar_podio_manual(supabase, mes_ano, gestor):
+    """Carrega pódio manual do Supabase"""
+    if not supabase:
+        return None
     
-    if dados['delta_csat'] > 0:
-        analise_csat = f"superou a meta em {dados['delta_csat']:.2f} pontos percentuais"
-    elif dados['delta_csat'] < 0:
-        analise_csat = f"ficou abaixo da meta em {abs(dados['delta_csat']):.2f} pontos percentuais"
-    else:
-        analise_csat = "atingiu exatamente a meta"
-    
-    diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
-    if diff_avaliacoes >= 0:
-        analise_avaliacoes = f"superou a meta de {dados['meta_geral']:.0f}% em {diff_avaliacoes:.2f} pontos percentuais"
-    else:
-        analise_avaliacoes = f"ficou abaixo da meta de {dados['meta_geral']:.0f}% em {abs(diff_avaliacoes):.2f} pontos percentuais"
-    
-    if dados['total_atendimentos'] > media_operacao:
-        produtividade = f"{(dados['total_atendimentos'] / media_operacao - 1) * 100:.2f}% superior à média da operação"
-    elif dados['total_atendimentos'] < media_operacao:
-        produtividade = f"{(1 - dados['total_atendimentos'] / media_operacao) * 100:.2f}% inferior à média da operação"
-    else:
-        produtividade = "igual à média da operação"
-    
-    if dados['csat'] >= 94:
-        nivel_csat = "extremamente alto"
-    elif dados['csat'] >= 90:
-        nivel_csat = "alto"
-    elif dados['csat'] >= 85:
-        nivel_csat = "bom"
-    else:
-        nivel_csat = "precisa de atenção"
-    
-    texto = f"""
-### 1. Qualidade e Satisfação do Cliente (CSAT)
-
-A colaboradora registrou um índice de **Satisfação (CSAT) de {dados['csat']:.2f}%**.
-
-- **Comparativo com a Meta:** O resultado {analise_csat} (meta: ≥ {dados['meta_csat']:.0f}%).
-- **Análise Detalhada:** Do volume total de feedbacks recebidos ({dados['avaliacoes']}), **{dados['positivos']} foram positivos**, resultando em um índice de aprovação {nivel_csat}. Houve apenas {dados['negativos']} registros negativos, demonstrando consistência na entrega de um atendimento cordial, eficiente e resolutivo.
-
-### 2. Engajamento e Coleta de Feedback
-
-A colaboradora alcançou uma **Taxa de Avaliações de {dados['perc_avaliacoes']:.2f}%**.
-
-- **Comparativo com a Meta:** A meta esperada é de no mínimo {dados['meta_geral']:.0f}% de conversão de atendimentos em avaliações. O resultado {analise_avaliacoes}, refletindo uma {'proatividade exemplar' if dados['perc_avaliacoes'] >= dados['meta_geral'] else 'oportunidade de melhoria'} na solicitação de feedback ao final de cada contato.
-
-- **Cálculo:** A taxa foi calculada sobre o volume total de {dados['avaliacoes']} avaliações divididas pelos **{dados['validos']} atendimentos válidos**.
-
-### 3. Produtividade e Volumetria
-
-O volume total de atendimentos realizados pela colaboradora foi de **{dados['total_atendimentos']} chamados**.
-
-- **Comparativo com a Operação:** A média de atendimentos por agente da operação no período foi de {media_operacao}. {analista} absorveu uma demanda operacional **{produtividade}**.
-
-- **Destaque:** {posicao} do mês em CSAT.
-"""
-    return texto.strip()
+    try:
+        response = supabase.table('podio_manual').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).order('posicao').execute()
+        if response.data:
+            return [(d['analista'], d['csat'], d['atendimentos'], 0) for d in response.data]
+        return None
+    except Exception as e:
+        st.error(f"Erro ao carregar pódio: {str(e)}")
+        return None
 
 # ============================================
-# GERENCIAMENTO DE ANALISTAS
+# MULTI-LOGIN
 # ============================================
+
+USUARIOS = {
+    "marcos": {
+        "senha": "marcos2026",
+        "nome": "Marcos Miranda",
+        "gestor": "Sua Gestão - Chat Notas"
+    },
+    "polyana": {
+        "senha": "polyana2026",
+        "nome": "Polyana Ventura",
+        "gestor": "Gestão Polyana Ventura - Chat Outros"
+    }
+}
+
+def fazer_login():
+    """Tela de login"""
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🔐 Login")
+    
+    usuario = st.sidebar.text_input("Usuário")
+    senha = st.sidebar.text_input("Senha", type="password")
+    
+    if st.sidebar.button("Entrar", use_container_width=True):
+        if usuario in USUARIOS and USUARIOS[usuario]["senha"] == senha:
+            st.session_state.logado = True
+            st.session_state.usuario = usuario
+            st.session_state.nome_usuario = USUARIOS[usuario]["nome"]
+            st.session_state.gestor = USUARIOS[usuario]["gestor"]
+            st.rerun()
+        else:
+            st.sidebar.error("❌ Usuário ou senha inválidos!")
+    
+    if st.session_state.get('logado', False):
+        st.sidebar.success(f"✅ Logado como {st.session_state.nome_usuario}")
+        if st.sidebar.button("Sair", use_container_width=True):
+            st.session_state.logado = False
+            st.session_state.usuario = None
+            st.session_state.nome_usuario = None
+            st.session_state.gestor = None
+            st.rerun()
+        return True
+    return False
+
+# ============================================
+# FUNÇÕES AUXILIARES
+# ============================================
+
+def get_genero_neutro(nome):
+    """Determina o gênero baseado no nome"""
+    nomes_femininos = [
+        'Ana', 'Maria', 'Paula', 'Lorena', 'Vanessa', 'Rayane', 
+        'Karolyne', 'Polliana', 'Polyana', 'Ariane', 'Julia',
+        'Claudia', 'Almeida'
+    ]
+    
+    for nome_feminino in nomes_femininos:
+        if nome.startswith(nome_feminino):
+            return "colaboradora"
+    
+    if nome.endswith('a') and not nome.endswith('as'):
+        return "colaboradora"
+    
+    return "colaborador"
+
+def extrair_periodo(df_satisfacao):
+    """Extrai o período dos dados"""
+    colunas = df_satisfacao.columns.tolist()
+    
+    for col in colunas:
+        if 'data' in col.lower() or 'período' in col.lower() or 'periodo' in col.lower():
+            try:
+                datas = pd.to_datetime(df_satisfacao[col])
+                mes = datas.dt.month_name().iloc[0]
+                ano = datas.dt.year.iloc[0]
+                return f"{mes} {ano}"
+            except:
+                pass
+    
+    return datetime.now().strftime('%B %Y')
 
 def carregar_analistas():
-    """Carrega a lista de analistas do session_state ou arquivo"""
+    """Carrega a lista de analistas"""
     if 'analistas' not in st.session_state:
         st.session_state.analistas = {
             "Sua Gestão - Chat Notas": {
@@ -221,7 +250,6 @@ def carregar_analistas():
     return st.session_state.analistas
 
 def salvar_analistas(analistas):
-    """Salva a lista de analistas no session_state"""
     st.session_state.analistas = analistas
 
 # ============================================
@@ -256,7 +284,6 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
         perc_avaliacoes = (avaliacoes / validos * 100) if validos > 0 else 0
         csat = (positivos / avaliacoes * 100) if avaliacoes > 0 else 0
         
-        # ✅ CÁLCULO CORRETO DO % DE ENVIO
         nao_avaliaram = validos - avaliacoes
         perc_envio = (nao_avaliaram / validos * 100) if validos > 0 else 0
         
@@ -310,132 +337,342 @@ def calcular_media_operacao(resultados, gestor=None):
     total_analistas = len(dados_gestor)
     return round(total_atendimentos / total_analistas) if total_analistas > 0 else 0
 
-def calcular_podio(resultados, gestor=None):
-    """Calcula o pódio baseado no CSAT (apenas quem tem >= 25% avaliações)"""
+def calcular_podio(resultados, gestor=None, media_atendimentos=None, limiar_csat=90):
+    """Calcula o pódio baseado em CSAT ≥ 90% e Atendimentos ≥ média"""
     if gestor:
         dados_filtrados = {k: v for k, v in resultados.items() 
                           if v['gestor'] == gestor and v['avaliacoes'] > 0}
     else:
         dados_filtrados = {k: v for k, v in resultados.items() if v['avaliacoes'] > 0}
     
+    if media_atendimentos is None:
+        media_atendimentos = calcular_media_operacao(resultados, gestor)
+    
     dados_validos = {k: v for k, v in dados_filtrados.items() 
-                     if v['perc_avaliacoes'] >= 25}
+                     if v['csat'] >= limiar_csat and v['total_atendimentos'] >= media_atendimentos}
     
     sorted_analistas = sorted(dados_validos.items(), key=lambda x: x[1]['csat'], reverse=True)
     top_3 = sorted_analistas[:3]
     
-    return [(nome, dados['csat'], dados['total_atendimentos'], dados['perc_envio']) for nome, dados in top_3]
+    return [(nome, dados['csat'], dados['total_atendimentos'], dados['perc_avaliacoes']) for nome, dados in top_3]
 
 # ============================================
-# GERAÇÃO DE RELATÓRIOS
+# GERAÇÃO DE ANÁLISE E FEEDBACK
 # ============================================
 
-def gerar_feedback(analista, dados):
-    """Gera feedback no formato GUP (Mimo/Sari)"""
+def gerar_analise_tecnica(analista, dados, media_operacao, podio):
+    """Gera análise técnica detalhada"""
+    genero = get_genero_neutro(analista)
     
-    pontos_fortes = []
-    areas_melhoria = []
+    posicao = "não está no pódio"
+    for i, (nome, csat, atendimentos, perc_envio) in enumerate(podio, 1):
+        if nome == analista:
+            posicao = f"está em {i}º lugar no pódio com CSAT de {csat:.2f}%, {atendimentos} atendimentos"
+            break
     
-    if dados['csat'] >= dados['meta_csat']:
-        pontos_fortes.append("excelente performance em CSAT")
+    if dados['delta_csat'] > 0:
+        analise_csat = f"superou a meta em {dados['delta_csat']:.2f} pontos percentuais"
+    elif dados['delta_csat'] < 0:
+        analise_csat = f"ficou abaixo da meta em {abs(dados['delta_csat']):.2f} pontos percentuais"
     else:
-        areas_melhoria.append("melhorar o CSAT")
+        analise_csat = "atingiu exatamente a meta"
     
-    if dados['perc_avaliacoes'] >= dados['meta_geral']:
-        pontos_fortes.append("alta taxa de engajamento com coleta de feedback")
+    diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
+    if diff_avaliacoes >= 0:
+        analise_avaliacoes = f"superou a meta de {dados['meta_geral']:.0f}% em {diff_avaliacoes:.2f} pontos percentuais"
     else:
-        areas_melhoria.append("aumentar a taxa de coleta de avaliações")
+        analise_avaliacoes = f"ficou abaixo da meta de {dados['meta_geral']:.0f}% em {abs(diff_avaliacoes):.2f} pontos percentuais"
     
-    if dados['total_atendimentos'] > 0:
-        pontos_fortes.append("boa produtividade")
+    if dados['total_atendimentos'] > media_operacao:
+        produtividade = f"{(dados['total_atendimentos'] / media_operacao - 1) * 100:.2f}% superior à média da operação"
+    elif dados['total_atendimentos'] < media_operacao:
+        produtividade = f"{(1 - dados['total_atendimentos'] / media_operacao) * 100:.2f}% inferior à média da operação"
+    else:
+        produtividade = "igual à média da operação"
+    
+    if dados['csat'] >= 94:
+        nivel_csat = "extremamente alto"
+    elif dados['csat'] >= 90:
+        nivel_csat = "alto"
+    elif dados['csat'] >= 85:
+        nivel_csat = "bom"
+    else:
+        nivel_csat = "precisa de atenção"
+    
+    texto = f"""
+### 1. Qualidade e Satisfação do Cliente (CSAT)
+
+O(A) {genero} registrou um índice de **Satisfação (CSAT) de {dados['csat']:.2f}%**.
+
+- **Comparativo com a Meta:** O resultado {analise_csat} (meta: ≥ {dados['meta_csat']:.0f}%).
+- **Análise Detalhada:** Do volume total de feedbacks recebidos ({dados['avaliacoes']}), **{dados['positivos']} foram positivos**, resultando em um índice de aprovação {nivel_csat}. Houve apenas {dados['negativos']} registros negativos, demonstrando consistência na entrega de um atendimento cordial, eficiente e resolutivo.
+
+### 2. Engajamento e Coleta de Feedback
+
+O(A) {genero} alcançou uma **Taxa de Avaliações de {dados['perc_avaliacoes']:.2f}%**.
+
+- **Comparativo com a Meta:** A meta esperada é de no mínimo {dados['meta_geral']:.0f}% de conversão de atendimentos em avaliações. O resultado {analise_avaliacoes}, refletindo uma {'proatividade exemplar' if dados['perc_avaliacoes'] >= dados['meta_geral'] else 'oportunidade de melhoria'} na solicitação de feedback ao final de cada contato.
+
+- **Cálculo:** A taxa foi calculada sobre o volume total de {dados['avaliacoes']} avaliações divididas pelos **{dados['validos']} atendimentos válidos**.
+
+### 3. Produtividade e Volumetria
+
+O volume total de atendimentos realizados pelo(a) {genero} foi de **{dados['total_atendimentos']} chamados**.
+
+- **Comparativo com a Operação:** A média de atendimentos por agente da operação no período foi de {media_operacao}. {analista} absorveu uma demanda operacional **{produtividade}**.
+
+- **Destaque:** {posicao} do mês em CSAT.
+"""
+    return texto.strip()
+
+def gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio=None):
+    """Gera feedback no padrão MIMO"""
+    
+    genero = get_genero_neutro(analista)
+    
+    texto_podio = ""
+    if posicao_podio:
+        texto_podio = f" 🏆 {posicao_podio}º lugar no pódio do mês!"
     
     if dados['status'] == "🟢 Meta Superada":
-        avaliacao = "excelente"
-        recomendacao = "Continue mantendo este alto padrão de qualidade e produtividade. Seu desempenho é referência para a equipe."
+        abertura = f"Parabéns, {analista}! 🌟 Seu desempenho no último mês foi excelente{texto_podio}"
     elif dados['status'] == "🟡 Atenção":
-        avaliacao = "bom, com pontos de atenção"
-        recomendacao = f"Foque em {' e '.join(areas_melhoria)} para alcançar todas as metas. Você tem potencial para melhorar ainda mais."
+        abertura = f"Olá, {analista}! Seu desempenho no último mês foi bom, mas temos alguns pontos para ajustar{texto_podio}"
     else:
-        avaliacao = "precisa de atenção"
-        recomendacao = f"É necessário um plano de ação focado em {' e '.join(areas_melhoria)}. Conte com o suporte da gestão para isso."
+        abertura = f"Olá, {analista}! Precisamos conversar sobre seu desempenho no último mês"
+    
+    indicadores = f"""
+**📊 Indicadores de Performance:**
+
+- **CSAT:** {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
+- **Delta CSAT:** {dados['delta_csat']:+.2f} pontos percentuais
+- **% Avaliações:** {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
+- **💬 Atendimentos:** {dados['total_atendimentos']} chamados
+- **Média da Operação:** {media_operacao} chamados
+- **Avaliações:** {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
+"""
+    
+    pontos_fortes = []
+    oportunidades = []
+    
+    if dados['csat'] >= dados['meta_csat'] + 2:
+        pontos_fortes.append("CSAT acima da meta, demonstrando excelente qualidade no atendimento")
+    elif dados['csat'] < dados['meta_csat']:
+        oportunidades.append("CSAT abaixo da meta, foque em entender as causas das avaliações negativas")
+    
+    if dados['perc_avaliacoes'] >= dados['meta_geral'] + 5:
+        pontos_fortes.append("alta taxa de engajamento, excelente trabalho na coleta de feedback")
+    elif dados['perc_avaliacoes'] < dados['meta_geral']:
+        oportunidades.append("taxa de avaliações abaixo da meta, lembre-se de sempre oferecer a pesquisa ao final do atendimento")
+    
+    if dados['total_atendimentos'] > media_operacao:
+        pontos_fortes.append(f"produtividade {((dados['total_atendimentos']/media_operacao - 1)*100):.0f}% acima da média")
+    elif dados['total_atendimentos'] < media_operacao * 0.8:
+        oportunidades.append("produtividade abaixo da média, busque otimizar seu tempo entre os atendimentos")
+    
+    if pontos_fortes:
+        mensagem_desenvolvimento = f"**🌟 Pontos Fortes:**\n- " + "\n- ".join(pontos_fortes)
+    else:
+        mensagem_desenvolvimento = "**🌟 Pontos Fortes:** Continue se dedicando ao atendimento de qualidade."
+    
+    if oportunidades:
+        mensagem_desenvolvimento += f"\n\n**🎯 Oportunidades de Melhoria:**\n- " + "\n- ".join(oportunidades)
+    
+    if dados['status'] == "🟢 Meta Superada":
+        orientacao = f"""
+**📌 Próximos Passos:**
+
+1. Continue com o excelente trabalho! 🚀
+2. Compartilhe suas boas práticas com a equipe
+3. Mantenha o foco na qualidade e engajamento
+4. Meta para o próximo mês: manter CSAT ≥ {dados['meta_csat']:.0f}% e avaliações ≥ {dados['meta_geral']:.0f}%
+"""
+    elif dados['status'] == "🟡 Atenção":
+        orientacao = f"""
+**📌 Próximos Passos:**
+
+1. {oportunidades[0] if oportunidades else 'Foque em melhorar sua performance geral'}
+2. Agende uma conversa com seu gestor para alinhamento
+3. Revise seus atendimentos com avaliações negativas
+4. Meta para o próximo mês: CSAT ≥ {dados['meta_csat']:.0f}% e avaliações ≥ {dados['meta_geral']:.0f}%
+"""
+    else:
+        orientacao = f"""
+**📌 Próximos Passos:**
+
+1. 🚨 Plano de ação urgente necessário
+2. {oportunidades[0] if oportunidades else 'Revise completamente sua abordagem de atendimento'}
+3. Acompanhamento diário com seu gestor
+4. Meta para o próximo mês: CSAT ≥ {dados['meta_csat']:.0f}% e avaliações ≥ {dados['meta_geral']:.0f}%
+"""
     
     feedback = f"""
-**Feedback {dados['status']}**
+## 📝 Feedback de Performance
 
-**Colaborador:** {analista}
+### M - Mensagem de Abertura
+{abertura}
 
-**Avaliação Geral:** O desempenho do colaborador no período foi {avaliacao}.
+### I - Indicadores de Performance
+{indicadores}
 
-**Pontos Fortes:** {'; '.join(pontos_fortes) if pontos_fortes else 'Nenhum ponto forte identificado'}.
+### M - Mensagem de Desenvolvimento
+{mensagem_desenvolvimento}
 
-**Áreas de Melhoria:** {'; '.join(areas_melhoria) if areas_melhoria else 'Nenhuma área de melhoria identificada'}.
+### O - Orientação e Próximos Passos
+{orientacao}
 
-**Recomendação:** {recomendacao}
-
-**Próximos Passos:** 
-- Revisar os resultados em 30 dias
-- {f'Aplicar plano de ação focado em {areas_melhoria[0] if areas_melhoria else "manutenção do desempenho"}'}
+---
+**Status Geral:** {dados['status']}
+**Data:** {datetime.now().strftime('%d/%m/%Y')}
 """
     return feedback.strip()
 
-def gerar_relatorio_completo(analista, dados, analise_tecnica, feedback, media_operacao, podio):
-    """Gera o relatório completo no formato do exemplo da Ana Cláudia"""
+# ============================================
+# GERAÇÃO DE RELATÓRIO WORD
+# ============================================
+
+def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_operacao, podio, periodo):
+    """Gera relatório em formato Word (.docx)"""
+    
+    doc = Document()
+    
+    titulo = doc.add_heading(f'Relatório de Performance - {analista}', 0)
+    titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    doc.add_paragraph(f'Período: {periodo}')
+    doc.add_paragraph('')
+    
+    doc.add_heading('Esperado:', level=1)
+    doc.add_paragraph(f'≥ {dados["meta_geral"]:.0f}% de avaliações', style='List Bullet')
+    doc.add_paragraph(f'≥ {dados["meta_csat"]:.0f}% de Satisfação', style='List Bullet')
+    doc.add_paragraph('')
+    
+    doc.add_heading('Atingido:', level=1)
     
     posicao_texto = "Não está no pódio"
-    for i, (nome, csat, atendimentos, perc_envio) in enumerate(podio, 1):
+    for i, (nome, csat, atendimentos, perc_avaliacoes) in enumerate(podio, 1):
         if nome == analista:
-            posicao_texto = f"{i}º Lugar - 🏆 (CSAT: {csat:.2f}% | {atendimentos} atendimentos | % Envio: {perc_envio:.2f}%)"
+            posicao_texto = f"{i}º Lugar - CSAT: {csat:.2f}% | {atendimentos} atendimentos"
             break
     
-    relatorio = f"""
-# {analista}
-
-**Período:** {datetime.now().strftime('%d/%m/%Y a %d/%m/%Y')}
-
-## Esperado:
-
-- ≥ {dados['meta_geral']:.0f}% de avaliações
-- ≥ {dados['meta_csat']:.0f}% de Satisfação
-
-## Atingido:
-
-- **CSAT:** {dados['csat']:.2f}%
-- **Avaliações:** {dados['perc_avaliacoes']:.2f}% ({dados['positivos']} positivos + {dados['negativos']} negativos = {dados['avaliacoes']})
-- **% Envio:** {dados['perc_envio']:.2f}% ({dados['validos'] - dados['avaliacoes']} clientes não avaliaram)
-- **Atendidos:** {dados['total_atendimentos']} - {dados['total_inativos']} = {dados['validos']}
-- **Média por agente:** {media_operacao}
-- **Posição no Pódio:** {posicao_texto}
-
----
-
-## Análise Técnica de Desempenho
-
-{analise_tecnica}
-
----
-
-## Conclusão e Feedback
-
-**Status Geral do Período:** {dados['status']}
-
-{feedback}
-
----
-
-## 📊 Gráfico de Evolução Histórica
-
-*[Área reservada para gráfico de evolução histórica - AVD]*
-
-"""
-    return relatorio
+    doc.add_paragraph(f'CSAT: {dados["csat"]:.2f}%', style='List Bullet')
+    doc.add_paragraph(f'Avaliações: {dados["perc_avaliacoes"]:.2f}% ({dados["positivos"]} positivos + {dados["negativos"]} negativos = {dados["avaliacoes"]})', style='List Bullet')
+    doc.add_paragraph(f'Atendidos: {dados["total_atendimentos"]} - {dados["total_inativos"]} = {dados["validos"]}', style='List Bullet')
+    doc.add_paragraph(f'Média por agente: {media_operacao}', style='List Bullet')
+    doc.add_paragraph(f'Posição no Pódio: {posicao_texto}', style='List Bullet')
+    doc.add_paragraph('')
+    
+    doc.add_heading('Análise Técnica de Desempenho', level=1)
+    
+    analise_limpa = analise_tecnica.replace('###', '')
+    analise_limpa = analise_limpa.replace('**', '')
+    
+    for linha in analise_limpa.split('\n'):
+        if linha.strip():
+            if linha.strip().startswith('1.'):
+                doc.add_heading('Qualidade e Satisfação do Cliente (CSAT)', level=2)
+            elif linha.strip().startswith('2.'):
+                doc.add_heading('Engajamento e Coleta de Feedback', level=2)
+            elif linha.strip().startswith('3.'):
+                doc.add_heading('Produtividade e Volumetria', level=2)
+            else:
+                doc.add_paragraph(linha.strip())
+    
+    doc.add_paragraph('')
+    
+    doc.add_heading('Conclusão e Feedback', level=1)
+    doc.add_paragraph(f'Status Geral do Período: {dados["status"]}')
+    doc.add_paragraph('')
+    
+    for linha in feedback.split('\n'):
+        if linha.strip():
+            if linha.strip().startswith('##'):
+                continue
+            elif linha.strip().startswith('###'):
+                doc.add_heading(linha.strip().replace('###', '').strip(), level=2)
+            elif linha.strip().startswith('**'):
+                doc.add_paragraph(linha.strip())
+            else:
+                doc.add_paragraph(linha.strip())
+    
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
 
 # ============================================
-# INTERFACE STREAMLIT
+# DASHBOARD COM HISTÓRICO
+# ============================================
+
+def criar_dashboard_historico(df_historico, gestor_selecionado):
+    """Cria dashboard com gráficos históricos"""
+    
+    if df_historico is None or df_historico.empty:
+        st.info("Nenhum dado histórico disponível ainda.")
+        return
+    
+    df_filtrado = df_historico[df_historico['gestor'] == gestor_selecionado]
+    
+    if df_filtrado.empty:
+        st.info(f"Nenhum dado histórico para {gestor_selecionado}")
+        return
+    
+    df_mensal = df_filtrado.groupby('mes_ano').agg({
+        'csat': 'mean',
+        'perc_avaliacoes': 'mean',
+        'total_atendimentos': 'sum'
+    }).reset_index()
+    
+    fig_csat = px.line(
+        df_mensal,
+        x='mes_ano',
+        y='csat',
+        title='📈 Evolução do CSAT Médio',
+        labels={'mes_ano': 'Mês/Ano', 'csat': 'CSAT (%)'}
+    )
+    fig_csat.add_hline(y=90, line_dash="dash", line_color="green", annotation_text="Meta CSAT (90%)")
+    fig_csat.update_layout(height=400)
+    st.plotly_chart(fig_csat, use_container_width=True)
+    
+    fig_avaliacoes = px.line(
+        df_mensal,
+        x='mes_ano',
+        y='perc_avaliacoes',
+        title='📊 Evolução da Taxa de Avaliações',
+        labels={'mes_ano': 'Mês/Ano', 'perc_avaliacoes': '% Avaliações'}
+    )
+    fig_avaliacoes.add_hline(y=25, line_dash="dash", line_color="orange", annotation_text="Meta (25%)")
+    fig_avaliacoes.update_layout(height=400)
+    st.plotly_chart(fig_avaliacoes, use_container_width=True)
+    
+    st.subheader("📋 Evolução Individual por Mês")
+    
+    df_analista_mes = df_filtrado.pivot_table(
+        index='analista',
+        columns='mes_ano',
+        values='csat',
+        aggfunc='mean'
+    ).round(2)
+    
+    st.dataframe(df_analista_mes, use_container_width=True)
+
+# ============================================
+# INTERFACE PRINCIPAL
 # ============================================
 
 def main():
     st.title("📊 Sistema de Performance - Relatórios Automáticos")
     st.markdown("---")
+    
+    if not fazer_login():
+        st.info("👋 Faça login na barra lateral para acessar o sistema.")
+        return
+    
+    supabase = init_supabase()
+    if supabase:
+        st.sidebar.success("✅ Conectado ao Supabase")
+    else:
+        st.sidebar.warning("⚠️ Supabase não configurado. Configure as variáveis de ambiente.")
     
     analistas_config = carregar_analistas()
     
@@ -453,32 +690,46 @@ def main():
         )
         
         st.markdown("---")
-        st.header("🤖 Configuração Gemini")
         
-        api_key_input = st.text_input(
-            "Chave da API Gemini",
-            type="password",
-            placeholder="Cole sua chave API aqui"
-        )
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 Processar", use_container_width=True):
+                if arquivo_satisfacao and arquivo_inativos:
+                    with st.spinner("Processando dados..."):
+                        df_satisfacao = pd.read_excel(arquivo_satisfacao)
+                        df_inativos = pd.read_excel(arquivo_inativos)
+                        
+                        periodo = extrair_periodo(df_satisfacao)
+                        st.session_state.periodo = periodo
+                        
+                        resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
+                        st.session_state.resultados = resultados
+                        st.session_state.processado = True
+                        
+                        if supabase:
+                            gestor_logado = st.session_state.gestor
+                            if salvar_historico(supabase, resultados, periodo, gestor_logado):
+                                st.success(f"✅ Dados salvos! Período: {periodo}")
+                            else:
+                                st.warning("⚠️ Dados processados, mas NÃO salvos no Supabase.")
+                        else:
+                            st.success(f"✅ Dados processados! Período: {periodo}")
+                else:
+                    st.error("❌ Envie os dois arquivos.")
         
-        if api_key_input:
-            os.environ["GEMINI_API_KEY"] = api_key_input
-            st.session_state.gemini_configured = True
-            st.success("✅ API Gemini configurada!")
-        
-        st.markdown("---")
-        
-        if st.button("🚀 Processar Dados", use_container_width=True):
-            if arquivo_satisfacao and arquivo_inativos:
-                with st.spinner("Processando dados..."):
-                    df_satisfacao = pd.read_excel(arquivo_satisfacao)
-                    df_inativos = pd.read_excel(arquivo_inativos)
-                    resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
-                    st.session_state.resultados = resultados
-                    st.session_state.processado = True
-                    st.success("✅ Dados processados com sucesso!")
-            else:
-                st.error("❌ Por favor, envie os dois arquivos.")
+        with col2:
+            if st.button("📊 Ver Histórico", use_container_width=True):
+                if supabase:
+                    gestor_logado = st.session_state.gestor
+                    df_historico = carregar_historico(supabase, gestor=gestor_logado)
+                    if df_historico is not None and not df_historico.empty:
+                        st.session_state.mostrar_historico = True
+                        st.session_state.df_historico = df_historico
+                        st.success("✅ Histórico carregado!")
+                    else:
+                        st.warning("Nenhum histórico encontrado.")
+                else:
+                    st.error("❌ Supabase não configurado.")
         
         st.markdown("---")
         st.header("⚙️ Gerenciar Analistas")
@@ -486,6 +737,7 @@ def main():
         if st.button("📝 Gerenciar Analistas", use_container_width=True):
             st.session_state.gerenciar_analistas = True
     
+    # ===== GERENCIAR ANALISTAS =====
     if st.session_state.get('gerenciar_analistas', False):
         st.header("📝 Gerenciar Analistas")
         
@@ -576,181 +828,368 @@ def main():
         
         st.markdown("---")
     
-    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False):
-        resultados = st.session_state.resultados
+    # ===== VISUALIZAR HISTÓRICO =====
+    if st.session_state.get('mostrar_historico', False):
+        st.header("📊 Dashboard Histórico")
+        
+        df_historico = st.session_state.df_historico
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            meses_disponiveis = ['Todos'] + sorted(df_historico['mes_ano'].unique().tolist())
+            mes_selecionado = st.selectbox("Selecione o Mês", meses_disponiveis)
+        with col2:
+            gestores_disponiveis = ['Todos'] + sorted(df_historico['gestor'].unique().tolist())
+            gestor_filtro = st.selectbox("Selecione o Gestor", gestores_disponiveis)
+        
+        df_filtrado = df_historico.copy()
+        if mes_selecionado != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['mes_ano'] == mes_selecionado]
+        if gestor_filtro != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['gestor'] == gestor_filtro]
         
         col1, col2, col3, col4 = st.columns(4)
-        total_analistas = len(resultados)
-        total_atendimentos = sum([d['total_atendimentos'] for d in resultados.values()])
-        media_atendimentos = total_atendimentos / total_analistas if total_analistas > 0 else 0
-        metas_superadas = len([d for d in resultados.values() if d['status'] == '🟢 Meta Superada'])
-        
         with col1:
-            st.metric("Total de Analistas", total_analistas)
+            st.metric("Total Registros", len(df_filtrado))
         with col2:
-            st.metric("Total de Atendimentos", f"{total_atendimentos:,}")
+            st.metric("CSAT Médio", f"{df_filtrado['csat'].mean():.2f}%")
         with col3:
-            st.metric("Média Geral de Atendimentos", f"{media_atendimentos:.0f}")
+            st.metric("% Avaliações Médio", f"{df_filtrado['perc_avaliacoes'].mean():.2f}%")
         with col4:
-            st.metric("Metas Superadas", f"{metas_superadas}/{total_analistas}")
+            st.metric("Total Atendimentos", f"{df_filtrado['total_atendimentos'].sum():,}")
         
         st.markdown("---")
         
-        gestores_disponiveis = list(analistas_config.keys())
-        gestor_selecionado = st.selectbox(
-            "Selecione o Gestor",
-            gestores_disponiveis
+        criar_dashboard_historico(df_filtrado, st.session_state.gestor)
+        
+        st.subheader("📋 Dados Históricos")
+        st.dataframe(df_filtrado, use_container_width=True)
+        
+        if st.button("🔙 Voltar para Dados Atuais"):
+            st.session_state.mostrar_historico = False
+            st.rerun()
+        
+        st.markdown("---")
+    
+    # ===== VISUALIZAÇÃO DE RESULTADOS ATUAIS =====
+    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False):
+        resultados = st.session_state.resultados
+        periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
+        
+        gestor_logado = st.session_state.gestor
+        resultados_gestor = {k: v for k, v in resultados.items() if v['gestor'] == gestor_logado}
+        
+        if not resultados_gestor:
+            st.warning("Nenhum dado encontrado para seu time.")
+            return
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        total_analistas = len(resultados_gestor)
+        total_atendimentos = sum([d['total_atendimentos'] for d in resultados_gestor.values()])
+        media_atendimentos = total_atendimentos / total_analistas if total_analistas > 0 else 0
+        
+        with col1:
+            st.metric("📊 Analistas", total_analistas)
+        with col2:
+            st.metric("📞 Atendimentos", f"{total_atendimentos:,}")
+        with col3:
+            st.metric("📈 Média Atend.", f"{media_atendimentos:.0f}")
+        with col4:
+            metas = len([d for d in resultados_gestor.values() if d['status'] == '🟢 Meta Superada'])
+            st.metric("🏆 Metas", f"{metas}/{total_analistas}")
+        with col5:
+            csat_medio = sum([d['csat'] for d in resultados_gestor.values()]) / total_analistas if total_analistas > 0 else 0
+            st.metric("⭐ CSAT Médio", f"{csat_medio:.2f}%")
+        
+        st.info(f"📅 Período: {periodo}")
+        st.markdown("---")
+        
+        # Dashboard com gráficos
+        st.header("📊 Dashboard de Performance")
+        
+        df_dashboard = pd.DataFrame([
+            {
+                'Analista': nome,
+                'CSAT': dados['csat'],
+                '% Avaliações': dados['perc_avaliacoes'],
+                '% Envio': dados['perc_envio'],
+                '💬 Atendimentos': dados['total_atendimentos'],
+                'Status': dados['status']
+            }
+            for nome, dados in resultados_gestor.items()
+        ])
+        
+        if not df_dashboard.empty:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                fig_csat = px.bar(
+                    df_dashboard,
+                    x='Analista',
+                    y='CSAT',
+                    color='CSAT',
+                    color_continuous_scale=['red', 'yellow', 'green'],
+                    range_color=[0, 100],
+                    title='📊 CSAT por Analista',
+                    text=df_dashboard['CSAT'].apply(lambda x: f'{x:.1f}%')
+                )
+                fig_csat.update_traces(textposition='outside')
+                fig_csat.update_layout(height=400)
+                st.plotly_chart(fig_csat, use_container_width=True)
+            
+            with col2:
+                fig_avaliacoes = px.bar(
+                    df_dashboard,
+                    x='Analista',
+                    y='% Avaliações',
+                    color='% Avaliações',
+                    color_continuous_scale=['red', 'yellow', 'green'],
+                    range_color=[0, 50],
+                    title='📈 % Avaliações por Analista',
+                    text=df_dashboard['% Avaliações'].apply(lambda x: f'{x:.1f}%')
+                )
+                fig_avaliacoes.update_traces(textposition='outside')
+                fig_avaliacoes.update_layout(height=400)
+                st.plotly_chart(fig_avaliacoes, use_container_width=True)
+            
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                fig_scatter = px.scatter(
+                    df_dashboard,
+                    x='💬 Atendimentos',
+                    y='CSAT',
+                    size='💬 Atendimentos',
+                    color='Status',
+                    hover_data=['Analista'],
+                    title='🎯 CSAT vs 💬 Atendimentos',
+                    labels={'💬 Atendimentos': '💬 Quantidade de Atendimentos', 'CSAT': 'CSAT (%)'}
+                )
+                fig_scatter.update_layout(height=400)
+                st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            with col4:
+                status_counts = df_dashboard['Status'].value_counts()
+                fig_pie = px.pie(
+                    values=status_counts.values,
+                    names=status_counts.index,
+                    title='📊 Distribuição de Status'
+                )
+                fig_pie.update_layout(height=400)
+                st.plotly_chart(fig_pie, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Pódio
+        st.subheader("🏆 Pódio do Mês")
+        
+        podio = calcular_podio(resultados, gestor_logado, media_atendimentos)
+        
+        if supabase:
+            podio_manual = carregar_podio_manual(supabase, periodo, gestor_logado)
+            if podio_manual:
+                podio = podio_manual
+        
+        with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
+            st.info("Ajuste manualmente os resultados do pódio se necessário.")
+            
+            podio_manual = []
+            for i in range(3):
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    if i < len(podio):
+                        nome = podio[i][0]
+                    else:
+                        nome = ""
+                    nome_edit = st.text_input(f"{i+1}º - Nome", value=nome, key=f"podio_nome_{i}")
+                with col2:
+                    if i < len(podio):
+                        csat = podio[i][1]
+                    else:
+                        csat = 0
+                    csat_edit = st.number_input(f"CSAT (%)", value=float(csat), key=f"podio_csat_{i}")
+                with col3:
+                    if i < len(podio):
+                        atend = podio[i][2]
+                    else:
+                        atend = 0
+                    atend_edit = st.number_input(f"💬 Atendimentos", value=int(atend), key=f"podio_atend_{i}")
+                
+                if nome_edit:
+                    podio_manual.append((nome_edit, csat_edit, atend_edit, 0))
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if podio_manual and st.button("💾 Salvar Pódio Manual"):
+                    if supabase:
+                        if salvar_podio_manual(supabase, periodo, gestor_logado, podio_manual):
+                            podio = podio_manual
+                            st.success("✅ Pódio manual salvo com sucesso!")
+                            st.rerun()
+                    else:
+                        st.error("❌ Supabase não configurado.")
+            
+            with col2:
+                if st.button("🔄 Resetar Pódio"):
+                    if supabase:
+                        supabase.table('podio_manual').delete().eq('mes_ano', periodo).eq('gestor', gestor_logado).execute()
+                        st.success("✅ Pódio resetado!")
+                        st.rerun()
+        
+        if podio:
+            col1, col2, col3 = st.columns(3)
+            for i, (col, (nome, csat, atendimentos, _)) in enumerate(zip([col1, col2, col3], podio), 1):
+                medalha = ["🥇", "🥈", "🥉"][i-1]
+                cores = ['#FFD700', '#C0C0C0', '#CD7F32']
+                with col:
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 20px; border: 2px solid #ddd; border-radius: 10px; background-color: {cores[i-1]}20;">
+                        <h1 style="font-size: 48px; margin: 0;">{medalha}</h1>
+                        <h3 style="margin: 5px 0;">{i}º Lugar</h3>
+                        <h2 style="margin: 5px 0;">{nome}</h2>
+                        <p style="font-size: 24px; font-weight: bold; margin: 5px 0;">{csat:.2f}%</p>
+                        <p style="margin: 5px 0;">CSAT</p>
+                        <p style="margin: 5px 0; font-size: 16px; color: #444;">💬 {atendimentos} atendimentos</p>
+                        <p style="margin: 5px 0; font-size: 14px; color: #28a745;">✅ CSAT ≥ 90% | Atend. ≥ Média</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("Nenhum analista atingiu os critérios do pódio (CSAT ≥ 90% e 💬 Atendimentos ≥ Média)")
+        
+        st.markdown("---")
+        
+        # Tabela de desempenho
+        st.subheader("📋 Desempenho Individual")
+        
+        dados_tabela = []
+        for analista, dados in sorted(resultados_gestor.items(), key=lambda x: x[1]['csat'], reverse=True):
+            no_podio = any(p[0] == analista for p in podio)
+            podio_icon = "🏆" if no_podio else ""
+            
+            dados_tabela.append({
+                'Analista': f"{podio_icon} {analista}",
+                'CSAT': f"{dados['csat']:.2f}%",
+                'Meta CSAT': f"{dados['meta_csat']:.0f}%",
+                'Delta': f"{dados['delta_csat']:+.2f}%",
+                '% Avaliações': f"{dados['perc_avaliacoes']:.2f}%",
+                'Meta Avaliações': f"{dados['meta_geral']:.0f}%",
+                '💬 Atendimentos': dados['total_atendimentos'],
+                'Média Operação': f"{media_atendimentos:.0f}",
+                'Status': dados['status']
+            })
+        
+        df_tabela = pd.DataFrame(dados_tabela)
+        st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+        
+        st.markdown("---")
+        
+        # Gerar relatório individual
+        st.subheader("📄 Gerar Relatório Individual")
+        
+        analista_selecionado = st.selectbox(
+            "Selecione o Analista",
+            list(resultados_gestor.keys())
         )
         
-        if gestor_selecionado:
-            resultados_gestor = {k: v for k, v in resultados.items() if v['gestor'] == gestor_selecionado}
+        if analista_selecionado:
+            dados = resultados_gestor[analista_selecionado]
             
-            if resultados_gestor:
-                media_gestor = calcular_media_operacao(resultados, gestor_selecionado)
-                podio_gestor = calcular_podio(resultados, gestor_selecionado)
-                
-                col1, col2, col3, col4, col5 = st.columns(5)
-                with col1:
-                    st.metric("Analistas", len(resultados_gestor))
-                with col2:
-                    csat_medio = sum([d['csat'] for d in resultados_gestor.values()]) / len(resultados_gestor)
-                    st.metric("CSAT Médio", f"{csat_medio:.2f}%")
-                with col3:
-                    perc_medio = sum([d['perc_avaliacoes'] for d in resultados_gestor.values()]) / len(resultados_gestor)
-                    st.metric("% Avaliações Médio", f"{perc_medio:.2f}%")
-                with col4:
-                    st.metric("Média Atendimentos", f"{media_gestor:.0f}")
-                with col5:
-                    metas_time = len([d for d in resultados_gestor.values() if d['status'] == '🟢 Meta Superada'])
-                    st.metric("Metas Superadas", f"{metas_time}/{len(resultados_gestor)}")
-                
-                st.markdown("---")
-                
-                st.subheader("📋 Desempenho Individual")
-                
-                dados_tabela = []
-                for analista, dados in sorted(resultados_gestor.items(), key=lambda x: x[1]['csat'], reverse=True):
-                    dados_tabela.append({
-                        'Analista': analista,
-                        'CSAT': f"{dados['csat']:.2f}%",
-                        'Meta CSAT': f"{dados['meta_csat']:.0f}%",
-                        'Delta': f"{dados['delta_csat']:+.2f}%",
-                        '% Avaliações': f"{dados['perc_avaliacoes']:.2f}%",
-                        'Meta Avaliações': f"{dados['meta_geral']:.0f}%",
-                        '% Envio': f"{dados['perc_envio']:.2f}%",
-                        'Atendimentos': dados['total_atendimentos'],
-                        'Status': dados['status']
-                    })
-                
-                df_tabela = pd.DataFrame(dados_tabela)
-                st.dataframe(df_tabela, use_container_width=True, hide_index=True)
-                
-                st.markdown("---")
-                
-                st.subheader("🏆 Pódio do Mês")
-                podio = calcular_podio(resultados, gestor_selecionado)
-                
-                if podio:
-                    col1, col2, col3 = st.columns(3)
-                    for i, (col, (nome, csat, atendimentos, perc_envio)) in enumerate(zip([col1, col2, col3], podio), 1):
-                        medalha = ["🥇", "🥈", "🥉"][i-1]
-                        cores = ['#FFD700', '#C0C0C0', '#CD7F32']
-                        with col:
-                            st.markdown(f"""
-                            <div style="text-align: center; padding: 20px; border: 2px solid #ddd; border-radius: 10px; background-color: {cores[i-1]}20;">
-                                <h1 style="font-size: 48px; margin: 0;">{medalha}</h1>
-                                <h3 style="margin: 5px 0;">{i}º Lugar</h3>
-                                <h2 style="margin: 5px 0;">{nome}</h2>
-                                <p style="font-size: 24px; font-weight: bold; margin: 5px 0;">{csat:.2f}%</p>
-                                <p style="margin: 5px 0;">CSAT</p>
-                                <p style="margin: 5px 0; font-size: 16px; color: #444;">📞 {atendimentos} atendimentos</p>
-                                <p style="margin: 5px 0; font-size: 16px; color: #444;">📤 {perc_envio:.2f}% não avaliaram</p>
-                                <p style="margin: 5px 0; font-size: 14px; color: #666;">✅ Avaliações ≥ 25%</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                else:
-                    st.info("Nenhum analista atingiu os critérios para o pódio (CSAT e avaliações ≥ 25%)")
-                
-                st.markdown("---")
-                
-                st.subheader("📄 Gerar Relatório Individual")
-                
-                analista_selecionado = st.selectbox(
-                    "Selecione o Analista",
-                    list(resultados_gestor.keys())
+            analise_tecnica = gerar_analise_tecnica(
+                analista_selecionado,
+                dados,
+                media_atendimentos,
+                podio
+            )
+            
+            posicao_podio = None
+            for i, (nome, _, _, _) in enumerate(podio, 1):
+                if nome == analista_selecionado:
+                    posicao_podio = i
+                    break
+            
+            feedback = gerar_feedback_mimo(
+                analista_selecionado,
+                dados,
+                media_atendimentos,
+                posicao_podio
+            )
+            
+            with st.expander("✏️ Editar Feedback (Padrão MIMO)", expanded=False):
+                feedback_editado = st.text_area(
+                    "Edite o feedback abaixo:",
+                    value=feedback,
+                    height=400
                 )
-                
-                if analista_selecionado:
-                    dados = resultados_gestor[analista_selecionado]
-                    
-                    media_operacao_geral = calcular_media_operacao(resultados)
-                    podio_geral = calcular_podio(resultados)
-                    
-                    usar_gemini = st.checkbox(
-                        "🤖 Usar Gemini para análise técnica (requer API configurada)",
-                        value=st.session_state.get('gemini_configured', False)
-                    )
-                    
-                    with st.spinner("Gerando análise técnica..."):
-                        if usar_gemini and st.session_state.get('gemini_configured', False):
-                            analise_tecnica = gerar_analise_gemini(
-                                analista_selecionado,
-                                dados,
-                                media_operacao_geral,
-                                podio_geral
-                            )
-                        else:
-                            analise_tecnica = gerar_analise_tecnica_fallback(
-                                analista_selecionado,
-                                dados,
-                                media_operacao_geral,
-                                podio_geral
-                            )
-                    
-                    feedback = gerar_feedback(analista_selecionado, dados)
-                    
-                    with st.expander("✏️ Editar Feedback", expanded=False):
-                        feedback_editado = st.text_area(
-                            "Edite o feedback abaixo:",
-                            value=feedback,
-                            height=300
-                        )
-                        if feedback_editado != feedback:
-                            feedback = feedback_editado
-                    
-                    relatorio = gerar_relatorio_completo(
+                if feedback_editado != feedback:
+                    feedback = feedback_editado
+            
+            relatorio_markdown = f"""
+# {analista_selecionado}
+
+**Período:** {periodo}
+
+## Esperado:
+
+- ≥ {dados['meta_geral']:.0f}% de avaliações
+- ≥ {dados['meta_csat']:.0f}% de Satisfação
+
+## Atingido:
+
+- **CSAT:** {dados['csat']:.2f}%
+- **Avaliações:** {dados['perc_avaliacoes']:.2f}% ({dados['positivos']} positivos + {dados['negativos']} negativos = {dados['avaliacoes']})
+- **Atendidos:** {dados['total_atendimentos']} - {dados['total_inativos']} = {dados['validos']}
+- **Média por agente:** {media_atendimentos}
+
+---
+
+## Análise Técnica de Desempenho
+
+{analise_tecnica}
+
+---
+
+## Conclusão e Feedback
+
+**Status Geral do Período:** {dados['status']}
+
+{feedback}
+"""
+            
+            with st.expander("👁️ Visualizar Relatório", expanded=True):
+                st.markdown(relatorio_markdown)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.download_button(
+                    label="📥 Baixar Relatório (Word)",
+                    data=gerar_relatorio_word(
                         analista_selecionado,
                         dados,
                         analise_tecnica,
                         feedback,
-                        media_operacao_geral,
-                        podio_geral
-                    )
-                    
-                    with st.expander("👁️ Visualizar Relatório", expanded=True):
-                        st.markdown(relatorio)
-                    
-                    st.download_button(
-                        label="📥 Baixar Relatório (Markdown)",
-                        data=relatorio,
-                        file_name=f"Relatorio_{analista_selecionado.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.md",
-                        mime="text/markdown"
-                    )
-                    
-                    st.download_button(
-                        label="📥 Baixar Relatório (Word)",
-                        data=relatorio,
-                        file_name=f"Relatorio_{analista_selecionado.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-            else:
-                st.warning("Nenhum dado encontrado para este gestor.")
+                        media_atendimentos,
+                        podio,
+                        periodo
+                    ),
+                    file_name=f"Relatorio_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+            
+            with col2:
+                st.download_button(
+                    label="📥 Baixar Relatório (Markdown)",
+                    data=relatorio_markdown,
+                    file_name=f"Relatorio_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.md",
+                    mime="text/markdown"
+                )
     
     st.markdown("---")
     st.markdown(
         """
         <div style="text-align: center; color: #666; font-size: 12px;">
-            Sistema de Performance v2.0 | Desenvolvido com ❤️
+            Sistema de Performance v4.0 | Supabase + Histórico
         </div>
         """,
         unsafe_allow_html=True
