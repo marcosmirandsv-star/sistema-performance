@@ -522,51 +522,61 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     if df_analista.empty:
         return None
     
-    # Criar gráfico
-    fig = go.Figure()
+    # Ordenar por mês/ano
+    df_analista = df_analista.sort_values('mes_ano')
     
-    # Adicionar CSAT
-    fig.add_trace(go.Scatter(
-        x=df_analista['mes_ano'],
-        y=df_analista['csat'],
-        name='CSAT Alcançado',
-        mode='lines+markers',
-        line=dict(color='#2ecc71', width=3),
-        marker=dict(size=10)
-    ))
+    # ===== CRIAR GRÁFICO USANDO PLOTLY EXPRESS =====
     
-    # Adicionar meta CSAT (linha constante)
-    fig.add_hline(
-        y=meta_csat, 
-        line_dash="dash", 
-        line_color="#e74c3c",
-        annotation_text=f"Meta CSAT: {meta_csat}%",
-        annotation_position="bottom right"
+    # 1. Gráfico de linha para CSAT
+    fig = px.line(
+        df_analista,
+        x='mes_ano',
+        y='csat',
+        title=f'📈 Evolução Mensal - {analista}',
+        labels={'mes_ano': 'Período', 'csat': 'CSAT (%)'},
+        markers=True
     )
     
-    # Adicionar % Avaliações
+    # Atualizar linha do CSAT
+    fig.update_traces(
+        line=dict(color='#2ecc71', width=3),
+        marker=dict(size=10, color='#2ecc71'),
+        name='CSAT Alcançado'
+    )
+    
+    # 2. Adicionar barras para % Avaliações (eixo secundário)
     fig.add_trace(go.Bar(
         x=df_analista['mes_ano'],
         y=df_analista['perc_avaliacoes'],
         name='% Avaliações',
         marker_color='#3498db',
-        opacity=0.7,
+        opacity=0.6,
         yaxis='y2'
     ))
     
-    # Adicionar meta avaliações (linha constante)
-    fig.add_hline(
-        y=meta_avaliacoes, 
-        line_dash="dot", 
-        line_color="#f39c12",
-        annotation_text=f"Meta Avaliações: {meta_avaliacoes}%",
-        annotation_position="top right",
+    # 3. Adicionar linha da meta CSAT (criando um trace separado)
+    meta_csat_data = [meta_csat] * len(df_analista)
+    fig.add_trace(go.Scatter(
+        x=df_analista['mes_ano'],
+        y=meta_csat_data,
+        name=f'Meta CSAT: {meta_csat}%',
+        line=dict(color='#e74c3c', width=2, dash='dash'),
+        mode='lines'
+    ))
+    
+    # 4. Adicionar linha da meta Avaliações (criando um trace separado)
+    meta_avaliacoes_data = [meta_avaliacoes] * len(df_analista)
+    fig.add_trace(go.Scatter(
+        x=df_analista['mes_ano'],
+        y=meta_avaliacoes_data,
+        name=f'Meta Avaliações: {meta_avaliacoes}%',
+        line=dict(color='#f39c12', width=2, dash='dot'),
+        mode='lines',
         yaxis='y2'
-    )
+    ))
     
     # Configurar layout com dois eixos Y
     fig.update_layout(
-        title=f'📈 Evolução Mensal - {analista}',
         xaxis_title='Período',
         yaxis=dict(
             title='CSAT (%)',
@@ -587,11 +597,11 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
             xanchor='right',
             x=1
         ),
-        height=450
+        height=450,
+        template='plotly_white'
     )
     
     return fig
-
 def gerar_analise_tecnica(analista, dados, media_operacao, podio):
     """Gera análise técnica detalhada"""
     genero = get_genero_neutro(analista)
