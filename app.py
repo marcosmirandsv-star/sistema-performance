@@ -10,7 +10,7 @@ from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from supabase import create_client, Client
-import google.generativeai as genai
+import requests
 
 # ============================================
 # CONFIGURAÇÕES INICIAIS
@@ -137,70 +137,97 @@ def carregar_podio_manual(supabase, mes_ano, gestor):
         return None
 
 # ============================================
-# CONFIGURAÇÃO DA IA (GEMINI)
+# CONFIGURAÇÃO DA IA - GITHUB COPILOT
 # ============================================
 
-def configurar_ia():
-    """Configura a API da IA"""
-    try:
-        api_key = st.secrets.get("GEMINI_API_KEY", "")
-        if api_key:
-            genai.configure(api_key=api_key)
-            return True
-    except:
-        pass
+def gerar_feedback_copilot(analista, dados, media_operacao, observacoes, posicao_podio=None):
+    """
+    Gera feedback usando GitHub Copilot via API
+    """
     
     try:
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        if api_key:
-            genai.configure(api_key=api_key)
-            return True
-    except:
-        pass
-    
-    return False
-
-def gerar_feedback_ia(analista, dados, media_operacao, observacoes, posicao_podio=None):
-    """Gera feedback usando IA com base nos dados e observações"""
-    
-    if not configurar_ia():
-        return gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio)
-    
-    try:
+        # Construir o prompt completo
         genero = get_genero_neutro(analista)
         
-        prompt = f"""
-        Você é um especialista em gestão de performance de equipes de atendimento.
-        Gere um feedback de performance para o colaborador {analista} no formato MIMO.
-
-        ## DADOS DO COLABORADOR:
-        - CSAT: {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
-        - Delta CSAT: {dados['delta_csat']:+.2f} pontos
-        - % Avaliações: {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
-        - % Envio: {dados['perc_envio']:.2f}%
-        - Atendimentos: {dados['total_atendimentos']}
-        - Média da operação: {media_operacao}
-        - Avaliações: {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
-        - Status: {dados['status']}
-
-        ## OBSERVAÇÕES DO GESTOR:
-        {observacoes if observacoes else "Nenhuma observação adicional fornecida."}
-
-        ## FORMATO MIMO:
-        M - Mensagem de Abertura: Comece com uma saudação e reconhecimento
-        I - Indicadores: Apresente os dados de performance de forma clara
-        M - Mensagem de Desenvolvimento: Destaque pontos fortes e oportunidades
-        O - Orientação: Dê próximos passos e recomendações
-
-        Use tom profissional, construtivo e motivador.
-        """
+        texto_podio = ""
+        if posicao_podio:
+            texto_podio = f" 🏆 {posicao_podio}º lugar no pódio do mês!"
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        # Dados formatados
+        dados_texto = f"""
+## DADOS DO COLABORADOR:
+- Nome: {analista}
+- Gênero: {genero}
+- CSAT: {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
+- Delta CSAT: {dados['delta_csat']:+.2f} pontos
+- % Avaliações: {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
+- % Envio: {dados['perc_envio']:.2f}%
+- Atendimentos: {dados['total_atendimentos']}
+- Média da operação: {media_operacao}
+- Avaliações: {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
+- Status: {dados['status']}
+{texto_podio}
+
+## OBSERVAÇÕES DO GESTOR:
+{observacoes if observacoes else "Nenhuma observação adicional fornecida."}
+
+## INSTRUÇÕES:
+Gere um feedback de performance no formato MIMO:
+
+M - Mensagem de Abertura: Comece com uma saudação e reconhecimento
+I - Indicadores: Apresente os dados de performance de forma clara
+M - Mensagem de Desenvolvimento: Destaque pontos fortes e oportunidades
+O - Orientação: Dê próximos passos e recomendações
+
+Use tom profissional, construtivo e motivador. Seja específico com os dados.
+"""
         
+        # Usar a API do GitHub Copilot (via GitHub Models)
+        # https://github.com/marketplace/models
+        
+        # Primeiro, tentar usar o modelo via GitHub Models (beta)
+        # Você precisa ter acesso ao GitHub Models Preview
+        
+        github_token = st.secrets.get("GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
+        if not github_token:
+            return gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio)
+        
+        # Usar a API do GitHub Copilot (via GitHub Models)
+        headers = {
+            "Authorization": f"Bearer {github_token}",
+            "Content-Type": "application/json"
+        }
+        
+        # URL da API do GitHub Models
+        url = "https://models.inference.ai.azure.com/chat/completions"
+        
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Você é um especialista em gestão de performance de equipes de atendimento ao cliente."
+                },
+                {
+                    "role": "user",
+                    "content": dados_texto
+                }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 800
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip()
+        else:
+            # Fallback para o feedback padrão
+            return gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio)
+            
     except Exception as e:
-        st.warning(f"Erro ao gerar feedback com IA: {str(e)}")
+        st.warning(f"Erro ao gerar feedback com Copilot: {str(e)}. Usando feedback padrão.")
         return gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio)
 
 # ============================================
@@ -315,7 +342,7 @@ def carregar_analistas():
                     "João Pedro Santana": {"meta_csat": 90, "ativo": True},
                     "Karolyne Moreira": {"meta_csat": 86, "ativo": True},
                     "Luan Pereira": {"meta_csat": 86, "ativo": True},
-                    "Mario Junior": {"meta_csat": 90, "ativo": True},  # ALTERADO PARA 90%
+                    "Mario Junior": {"meta_csat": 90, "ativo": True},
                     "Maycon Oliveira": {"meta_csat": 86, "ativo": True},
                     "Miguel Augusto": {"meta_csat": 86, "ativo": True},
                     "Polliana Santana": {"meta_csat": 86, "ativo": True}
@@ -1174,7 +1201,7 @@ def main():
                 fig_scatter.update_layout(height=400)
                 st.plotly_chart(fig_scatter, use_container_width=True)
             
-            # Distribuição de Status com % Envio
+            # Distribuição de Status com % Avaliações e % Envio
             st.subheader("📊 Distribuição de Status")
             status_counts = df_dashboard['Status'].value_counts()
             
@@ -1195,13 +1222,15 @@ def main():
                 st.plotly_chart(fig_pie, use_container_width=True)
             
             with col2:
-                # Tabela resumo dos status com % Envio
+                # Tabela resumo dos status com % Avaliações e % Envio
                 status_df = df_dashboard.groupby('Status').agg({
                     'Analista': 'count',
+                    '% Avaliações': 'mean',
                     '% Envio': 'mean'
                 }).reset_index()
-                status_df.columns = ['Status', 'Quantidade', '% Envio Médio']
+                status_df.columns = ['Status', 'Quantidade', '% Avaliações Médio', '% Envio Médio']
                 status_df['%'] = (status_df['Quantidade'] / len(df_dashboard) * 100).round(1)
+                status_df['% Avaliações Médio'] = status_df['% Avaliações Médio'].round(2)
                 status_df['% Envio Médio'] = status_df['% Envio Médio'].round(2)
                 st.dataframe(status_df, use_container_width=True, hide_index=True)
         
@@ -1291,7 +1320,7 @@ def main():
                         <p style="font-size: 24px; font-weight: bold; margin: 5px 0;">{csat:.2f}%</p>
                         <p style="margin: 5px 0;">CSAT</p>
                         <p style="margin: 5px 0; font-size: 16px; color: #444;">💬 {atendimentos} atendimentos</p>
-                        <p style="margin: 5px 0; font-size: 14px; color: #28a745;">✅ {perc_avaliacoes:.2f}% avaliações | Atend. ≥ Média</p>
+                        <p style="margin: 5px 0; font-size: 14px; color: #28a745;">{perc_avaliacoes:.2f}% avaliações</p>
                     </div>
                     """, unsafe_allow_html=True)
         else:
@@ -1357,13 +1386,14 @@ def main():
                 )
             
             usar_ia = st.checkbox(
-                "🤖 Gerar feedback com IA (requer API Gemini configurada)",
-                value=False
+                "🤖 Gerar feedback com IA (GitHub Copilot)",
+                value=False,
+                help="Requer token do GitHub configurado nas Secrets"
             )
             
             if usar_ia:
                 with st.spinner("Gerando feedback com IA..."):
-                    feedback = gerar_feedback_ia(
+                    feedback = gerar_feedback_copilot(
                         analista_selecionado,
                         dados,
                         media_atendimentos,
@@ -1453,7 +1483,7 @@ def main():
     st.markdown(
         """
         <div style="text-align: center; color: #666; font-size: 12px;">
-            Sistema de Performance v5.0 | Supabase + IA + Histórico
+            Sistema de Performance v5.0 | Supabase + Copilot + Histórico
         </div>
         """,
         unsafe_allow_html=True
