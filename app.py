@@ -10,6 +10,7 @@ from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from supabase import create_client, Client
+import google.generativeai as genai
 
 # ============================================
 # CONFIGURAÇÕES INICIAIS
@@ -98,8 +99,10 @@ def salvar_podio_manual(supabase, mes_ano, gestor, podio):
         return False
     
     try:
+        # Deletar pódio existente
         supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         
+        # Inserir novo pódio
         for i, (nome, csat, atendimentos, _) in enumerate(podio, 1):
             supabase.table('podio_manual').insert({
                 'mes_ano': mes_ano,
@@ -128,6 +131,66 @@ def carregar_podio_manual(supabase, mes_ano, gestor):
     except Exception as e:
         st.error(f"Erro ao carregar pódio: {str(e)}")
         return None
+
+# ============================================
+# CONFIGURAÇÃO DA IA (GEMINI/COPILOT)
+# ============================================
+
+def configurar_ia():
+    """Configura a API da IA"""
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        genai.configure(api_key=api_key)
+        return True
+    except:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+            return True
+        return False
+
+def gerar_feedback_ia(analista, dados, media_operacao, observacoes, posicao_podio=None):
+    """Gera feedback usando IA com base nos dados e observações"""
+    
+    if not configurar_ia():
+        return gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio)
+    
+    try:
+        genero = get_genero_neutro(analista)
+        
+        prompt = f"""
+        Você é um especialista em gestão de performance de equipes de atendimento.
+        Gere um feedback de performance para o colaborador {analista} no formato MIMO.
+
+        ## DADOS DO COLABORADOR:
+        - CSAT: {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
+        - Delta CSAT: {dados['delta_csat']:+.2f} pontos
+        - % Avaliações: {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
+        - % Envio: {dados['perc_envio']:.2f}%
+        - Atendimentos: {dados['total_atendimentos']}
+        - Média da operação: {media_operacao}
+        - Avaliações: {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
+        - Status: {dados['status']}
+
+        ## OBSERVAÇÕES DO GESTOR:
+        {observacoes if observacoes else "Nenhuma observação adicional fornecida."}
+
+        ## FORMATO MIMO:
+        M - Mensagem de Abertura: Comece com uma saudação e reconhecimento
+        I - Indicadores: Apresente os dados de performance de forma clara
+        M - Mensagem de Desenvolvimento: Destaque pontos fortes e oportunidades
+        O - Orientação: Dê próximos passos e recomendações
+
+        Use tom profissional, construtivo e motivador.
+        """
+        
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        return response.text.strip()
+        
+    except Exception as e:
+        st.warning(f"Erro ao gerar feedback com IA: {str(e)}")
+        return gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio)
 
 # ============================================
 # MULTI-LOGIN
@@ -221,8 +284,8 @@ def carregar_analistas():
                 "meta_geral_avaliacoes": 25,
                 "membros": {
                     "Ana Claudia Corrêa": {"meta_csat": 90, "ativo": True},
-                    "João Pedro Santana": {"meta_csat": 90, "ativo": True},
                     "João Vitor Almeida": {"meta_csat": 90, "ativo": True},
+                    "João Pedro Vianey": {"meta_csat": 90, "ativo": True},
                     "Lorena Almeida": {"meta_csat": 86, "ativo": True},
                     "Paulo Victor": {"meta_csat": 86, "ativo": True},
                     "Rayane Nunes": {"meta_csat": 86, "ativo": True},
@@ -238,6 +301,7 @@ def carregar_analistas():
                     "Diego Machado": {"meta_csat": 86, "ativo": True},
                     "Igor Siqueira": {"meta_csat": 86, "ativo": True},
                     "Ismael Chagas Bessa": {"meta_csat": 86, "ativo": True},
+                    "João Pedro Santana": {"meta_csat": 90, "ativo": True},
                     "Karolyne Moreira": {"meta_csat": 86, "ativo": True},
                     "Luan Pereira": {"meta_csat": 86, "ativo": True},
                     "Mario Junior": {"meta_csat": 86, "ativo": True},
@@ -284,6 +348,7 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
         perc_avaliacoes = (avaliacoes / validos * 100) if validos > 0 else 0
         csat = (positivos / avaliacoes * 100) if avaliacoes > 0 else 0
         
+        # % Envio = (Válidos - Avaliações) / Válidos × 100
         nao_avaliaram = validos - avaliacoes
         perc_envio = (nao_avaliaram / validos * 100) if validos > 0 else 0
         
@@ -426,7 +491,7 @@ O volume total de atendimentos realizados pelo(a) {genero} foi de **{dados['tota
     return texto.strip()
 
 def gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio=None):
-    """Gera feedback no padrão MIMO"""
+    """Gera feedback no padrão MIMO (fallback)"""
     
     genero = get_genero_neutro(analista)
     
@@ -447,6 +512,7 @@ def gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio=None):
 - **CSAT:** {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
 - **Delta CSAT:** {dados['delta_csat']:+.2f} pontos percentuais
 - **% Avaliações:** {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
+- **% Envio:** {dados['perc_envio']:.2f}%
 - **💬 Atendimentos:** {dados['total_atendimentos']} chamados
 - **Média da Operação:** {media_operacao} chamados
 - **Avaliações:** {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
@@ -557,6 +623,7 @@ def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_opera
     
     doc.add_paragraph(f'CSAT: {dados["csat"]:.2f}%', style='List Bullet')
     doc.add_paragraph(f'Avaliações: {dados["perc_avaliacoes"]:.2f}% ({dados["positivos"]} positivos + {dados["negativos"]} negativos = {dados["avaliacoes"]})', style='List Bullet')
+    doc.add_paragraph(f'% Envio: {dados["perc_envio"]:.2f}%', style='List Bullet')
     doc.add_paragraph(f'Atendidos: {dados["total_atendimentos"]} - {dados["total_inativos"]} = {dados["validos"]}', style='List Bullet')
     doc.add_paragraph(f'Média por agente: {media_operacao}', style='List Bullet')
     doc.add_paragraph(f'Posição no Pódio: {posicao_texto}', style='List Bullet')
@@ -620,30 +687,59 @@ def criar_dashboard_historico(df_historico, gestor_selecionado):
     df_mensal = df_filtrado.groupby('mes_ano').agg({
         'csat': 'mean',
         'perc_avaliacoes': 'mean',
+        'perc_envio': 'mean',
         'total_atendimentos': 'sum'
     }).reset_index()
     
-    fig_csat = px.line(
-        df_mensal,
-        x='mes_ano',
-        y='csat',
-        title='📈 Evolução do CSAT Médio',
-        labels={'mes_ano': 'Mês/Ano', 'csat': 'CSAT (%)'}
-    )
-    fig_csat.add_hline(y=90, line_dash="dash", line_color="green", annotation_text="Meta CSAT (90%)")
-    fig_csat.update_layout(height=400)
-    st.plotly_chart(fig_csat, use_container_width=True)
+    col1, col2 = st.columns(2)
     
-    fig_avaliacoes = px.line(
-        df_mensal,
-        x='mes_ano',
-        y='perc_avaliacoes',
-        title='📊 Evolução da Taxa de Avaliações',
-        labels={'mes_ano': 'Mês/Ano', 'perc_avaliacoes': '% Avaliações'}
-    )
-    fig_avaliacoes.add_hline(y=25, line_dash="dash", line_color="orange", annotation_text="Meta (25%)")
-    fig_avaliacoes.update_layout(height=400)
-    st.plotly_chart(fig_avaliacoes, use_container_width=True)
+    with col1:
+        fig_csat = px.line(
+            df_mensal,
+            x='mes_ano',
+            y='csat',
+            title='📈 Evolução do CSAT Médio',
+            labels={'mes_ano': 'Mês/Ano', 'csat': 'CSAT (%)'}
+        )
+        fig_csat.add_hline(y=90, line_dash="dash", line_color="green", annotation_text="Meta CSAT (90%)")
+        fig_csat.update_layout(height=400)
+        st.plotly_chart(fig_csat, use_container_width=True)
+    
+    with col2:
+        fig_avaliacoes = px.line(
+            df_mensal,
+            x='mes_ano',
+            y='perc_avaliacoes',
+            title='📊 Evolução da Taxa de Avaliações',
+            labels={'mes_ano': 'Mês/Ano', 'perc_avaliacoes': '% Avaliações'}
+        )
+        fig_avaliacoes.add_hline(y=25, line_dash="dash", line_color="orange", annotation_text="Meta (25%)")
+        fig_avaliacoes.update_layout(height=400)
+        st.plotly_chart(fig_avaliacoes, use_container_width=True)
+    
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        fig_envio = px.line(
+            df_mensal,
+            x='mes_ano',
+            y='perc_envio',
+            title='📤 Evolução do % Envio',
+            labels={'mes_ano': 'Mês/Ano', 'perc_envio': '% Envio'}
+        )
+        fig_envio.update_layout(height=400)
+        st.plotly_chart(fig_envio, use_container_width=True)
+    
+    with col4:
+        fig_atendimentos = px.bar(
+            df_mensal,
+            x='mes_ano',
+            y='total_atendimentos',
+            title='💬 Evolução do Total de Atendimentos',
+            labels={'mes_ano': 'Mês/Ano', 'total_atendimentos': 'Total de Atendimentos'}
+        )
+        fig_atendimentos.update_layout(height=400)
+        st.plotly_chart(fig_atendimentos, use_container_width=True)
     
     st.subheader("📋 Evolução Individual por Mês")
     
@@ -657,6 +753,162 @@ def criar_dashboard_historico(df_historico, gestor_selecionado):
     st.dataframe(df_analista_mes, use_container_width=True)
 
 # ============================================
+# GERENCIAR ANALISTAS COM MOVER ENTRE TIMES
+# ============================================
+
+def gerenciar_analistas_completo(analistas_config):
+    """Função para gerenciar analistas com opção de mover entre times"""
+    
+    st.header("📝 Gerenciar Analistas")
+    
+    # Selecionar gestor para edição
+    gestor_selecionado = st.selectbox(
+        "Selecione o Gestor para editar",
+        list(analistas_config.keys())
+    )
+    
+    if not gestor_selecionado:
+        return
+    
+    config = analistas_config[gestor_selecionado]
+    
+    # Editar meta geral
+    nova_meta = st.number_input(
+        "Meta Geral de Avaliações (%)",
+        min_value=0,
+        max_value=100,
+        value=config['meta_geral_avaliacoes']
+    )
+    if nova_meta != config['meta_geral_avaliacoes']:
+        config['meta_geral_avaliacoes'] = nova_meta
+        salvar_analistas(analistas_config)
+    
+    st.markdown("---")
+    
+    # ===== MOVER ANALISTA ENTRE TIMES =====
+    st.subheader("🔄 Mover Analista entre Times")
+    
+    # Listar todos os analistas ativos
+    todos_analistas = []
+    for gestor, cfg in analistas_config.items():
+        for analista, dados in cfg['membros'].items():
+            if dados['ativo']:
+                todos_analistas.append((analista, gestor))
+    
+    if todos_analistas:
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            analista_para_mover = st.selectbox(
+                "Selecione o analista",
+                [a[0] for a in todos_analistas]
+            )
+        
+        with col2:
+            # Encontrar gestor atual
+            gestor_atual = next((g for a, g in todos_analistas if a == analista_para_mover), None)
+            
+            # Listar outros gestores
+            outros_gestores = [g for g in analistas_config.keys() if g != gestor_atual]
+            if outros_gestores:
+                novo_gestor = st.selectbox(
+                    f"Time atual: {gestor_atual}",
+                    outros_gestores
+                )
+            else:
+                st.info("Apenas um time disponível.")
+                novo_gestor = None
+        
+        with col3:
+            if novo_gestor and st.button("🔄 Mover", use_container_width=True):
+                # Remover do time atual
+                del analistas_config[gestor_atual]['membros'][analista_para_mover]
+                
+                # Adicionar ao novo time (com meta padrão)
+                meta_atual = 86
+                if 'meta_csat' in analistas_config[gestor_atual]['membros'].get(analista_para_mover, {}):
+                    meta_atual = analistas_config[gestor_atual]['membros'][analista_para_mover]['meta_csat']
+                
+                analistas_config[novo_gestor]['membros'][analista_para_mover] = {
+                    "meta_csat": meta_atual,
+                    "ativo": True
+                }
+                
+                salvar_analistas(analistas_config)
+                st.success(f"✅ {analista_para_mover} movido para {novo_gestor}!")
+                st.rerun()
+    else:
+        st.info("Nenhum analista ativo para mover.")
+    
+    st.markdown("---")
+    
+    # ===== MEMBROS DO TIME =====
+    st.subheader(f"👥 Membros do Time: {gestor_selecionado}")
+    
+    membros = config['membros']
+    
+    # Adicionar novo membro
+    col1, col2, col3 = st.columns([3, 1, 1])
+    with col1:
+        novo_nome = st.text_input("Nome do novo analista")
+    with col2:
+        nova_meta_csat = st.number_input("Meta CSAT", min_value=0, max_value=100, value=86)
+    with col3:
+        if st.button("➕ Adicionar") and novo_nome:
+            membros[novo_nome] = {"meta_csat": nova_meta_csat, "ativo": True}
+            salvar_analistas(analistas_config)
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Tabela de membros
+    dados_tabela = []
+    for nome, dados in membros.items():
+        dados_tabela.append({
+            "Analista": nome,
+            "Meta CSAT": f"{dados['meta_csat']}%",
+            "Status": "✅ Ativo" if dados['ativo'] else "❌ Inativo"
+        })
+    
+    if dados_tabela:
+        df_membros = pd.DataFrame(dados_tabela)
+        st.dataframe(df_membros, use_container_width=True, hide_index=True)
+    
+    # Editar membro
+    st.subheader("✏️ Editar/Remover Membros")
+    membro_selecionado = st.selectbox(
+        "Selecione um membro para editar",
+        list(membros.keys())
+    )
+    
+    if membro_selecionado:
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            nova_meta_membro = st.number_input(
+                "Nova Meta CSAT",
+                min_value=0,
+                max_value=100,
+                value=membros[membro_selecionado]['meta_csat']
+            )
+        with col2:
+            novo_status = st.checkbox(
+                "Ativo",
+                value=membros[membro_selecionado]['ativo']
+            )
+        with col3:
+            if st.button("🗑️ Remover", use_container_width=True):
+                del membros[membro_selecionado]
+                salvar_analistas(analistas_config)
+                st.rerun()
+        
+        if nova_meta_membro != membros[membro_selecionado]['meta_csat'] or novo_status != membros[membro_selecionado]['ativo']:
+            membros[membro_selecionado]['meta_csat'] = nova_meta_membro
+            membros[membro_selecionado]['ativo'] = novo_status
+            salvar_analistas(analistas_config)
+            st.success("✅ Alterações salvas!")
+            st.rerun()
+
+# ============================================
 # INTERFACE PRINCIPAL
 # ============================================
 
@@ -668,6 +920,7 @@ def main():
         st.info("👋 Faça login na barra lateral para acessar o sistema.")
         return
     
+    # Inicializar Supabase
     supabase = init_supabase()
     if supabase:
         st.sidebar.success("✅ Conectado ao Supabase")
@@ -690,6 +943,15 @@ def main():
         )
         
         st.markdown("---")
+        st.header("📅 Período")
+        
+        # Permitir informar o período manualmente
+        periodo_manual = st.text_input(
+            "Informe o período (ex: Maio 2026)",
+            value=datetime.now().strftime('%B %Y')
+        )
+        
+        st.markdown("---")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -699,7 +961,12 @@ def main():
                         df_satisfacao = pd.read_excel(arquivo_satisfacao)
                         df_inativos = pd.read_excel(arquivo_inativos)
                         
-                        periodo = extrair_periodo(df_satisfacao)
+                        # Usar período manual ou extraído
+                        if periodo_manual:
+                            periodo = periodo_manual
+                        else:
+                            periodo = extrair_periodo(df_satisfacao)
+                        
                         st.session_state.periodo = periodo
                         
                         resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
@@ -739,88 +1006,7 @@ def main():
     
     # ===== GERENCIAR ANALISTAS =====
     if st.session_state.get('gerenciar_analistas', False):
-        st.header("📝 Gerenciar Analistas")
-        
-        gestor_selecionado = st.selectbox(
-            "Selecione o Gestor",
-            list(analistas_config.keys())
-        )
-        
-        if gestor_selecionado:
-            config = analistas_config[gestor_selecionado]
-            
-            nova_meta = st.number_input(
-                "Meta Geral de Avaliações (%)",
-                min_value=0,
-                max_value=100,
-                value=config['meta_geral_avaliacoes']
-            )
-            if nova_meta != config['meta_geral_avaliacoes']:
-                config['meta_geral_avaliacoes'] = nova_meta
-                salvar_analistas(analistas_config)
-            
-            st.markdown("---")
-            st.subheader("👥 Membros do Time")
-            
-            membros = config['membros']
-            
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                novo_nome = st.text_input("Nome do novo analista")
-            with col2:
-                nova_meta_csat = st.number_input("Meta CSAT", min_value=0, max_value=100, value=86)
-            with col3:
-                if st.button("➕ Adicionar") and novo_nome:
-                    membros[novo_nome] = {"meta_csat": nova_meta_csat, "ativo": True}
-                    salvar_analistas(analistas_config)
-                    st.rerun()
-            
-            st.markdown("---")
-            
-            dados_tabela = []
-            for nome, dados in membros.items():
-                dados_tabela.append({
-                    "Analista": nome,
-                    "Meta CSAT": f"{dados['meta_csat']}%",
-                    "Status": "✅ Ativo" if dados['ativo'] else "❌ Inativo"
-                })
-            
-            if dados_tabela:
-                df_membros = pd.DataFrame(dados_tabela)
-                st.dataframe(df_membros, use_container_width=True, hide_index=True)
-            
-            st.subheader("✏️ Editar/Remover Membros")
-            membro_selecionado = st.selectbox(
-                "Selecione um membro para editar",
-                list(membros.keys())
-            )
-            
-            if membro_selecionado:
-                col1, col2, col3 = st.columns([2, 1, 1])
-                with col1:
-                    nova_meta_membro = st.number_input(
-                        "Nova Meta CSAT",
-                        min_value=0,
-                        max_value=100,
-                        value=membros[membro_selecionado]['meta_csat']
-                    )
-                with col2:
-                    novo_status = st.checkbox(
-                        "Ativo",
-                        value=membros[membro_selecionado]['ativo']
-                    )
-                with col3:
-                    if st.button("🗑️ Remover", use_container_width=True):
-                        del membros[membro_selecionado]
-                        salvar_analistas(analistas_config)
-                        st.rerun()
-                
-                if nova_meta_membro != membros[membro_selecionado]['meta_csat'] or novo_status != membros[membro_selecionado]['ativo']:
-                    membros[membro_selecionado]['meta_csat'] = nova_meta_membro
-                    membros[membro_selecionado]['ativo'] = novo_status
-                    salvar_analistas(analistas_config)
-                    st.success("✅ Alterações salvas!")
-                    st.rerun()
+        gerenciar_analistas_completo(analistas_config)
         
         if st.button("🔙 Voltar", use_container_width=True):
             st.session_state.gerenciar_analistas = False
@@ -834,19 +1020,24 @@ def main():
         
         df_historico = st.session_state.df_historico
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             meses_disponiveis = ['Todos'] + sorted(df_historico['mes_ano'].unique().tolist())
             mes_selecionado = st.selectbox("Selecione o Mês", meses_disponiveis)
         with col2:
             gestores_disponiveis = ['Todos'] + sorted(df_historico['gestor'].unique().tolist())
             gestor_filtro = st.selectbox("Selecione o Gestor", gestores_disponiveis)
+        with col3:
+            analistas_historicos = ['Todos'] + sorted(df_historico['analista'].unique().tolist())
+            analista_filtro = st.selectbox("Selecione o Analista", analistas_historicos)
         
         df_filtrado = df_historico.copy()
         if mes_selecionado != 'Todos':
             df_filtrado = df_filtrado[df_filtrado['mes_ano'] == mes_selecionado]
         if gestor_filtro != 'Todos':
             df_filtrado = df_filtrado[df_filtrado['gestor'] == gestor_filtro]
+        if analista_filtro != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['analista'] == analista_filtro]
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -856,7 +1047,7 @@ def main():
         with col3:
             st.metric("% Avaliações Médio", f"{df_filtrado['perc_avaliacoes'].mean():.2f}%")
         with col4:
-            st.metric("Total Atendimentos", f"{df_filtrado['total_atendimentos'].sum():,}")
+            st.metric("% Envio Médio", f"{df_filtrado['perc_envio'].mean():.2f}%")
         
         st.markdown("---")
         
@@ -880,9 +1071,10 @@ def main():
         resultados_gestor = {k: v for k, v in resultados.items() if v['gestor'] == gestor_logado}
         
         if not resultados_gestor:
-            st.warning("Nenhum dado encontrado para seu time.")
+            st.warning("Nenhum dado encontrado para seu time. Verifique se os analistas estão configurados corretamente.")
             return
         
+        # Métricas
         col1, col2, col3, col4, col5 = st.columns(5)
         
         total_analistas = len(resultados_gestor)
@@ -892,7 +1084,7 @@ def main():
         with col1:
             st.metric("📊 Analistas", total_analistas)
         with col2:
-            st.metric("📞 Atendimentos", f"{total_atendimentos:,}")
+            st.metric("💬 Atendimentos", f"{total_atendimentos:,}")
         with col3:
             st.metric("📈 Média Atend.", f"{media_atendimentos:.0f}")
         with col4:
@@ -956,6 +1148,21 @@ def main():
             col3, col4 = st.columns(2)
             
             with col3:
+                fig_envio = px.bar(
+                    df_dashboard,
+                    x='Analista',
+                    y='% Envio',
+                    color='% Envio',
+                    color_continuous_scale=['green', 'yellow', 'red'],
+                    range_color=[0, 100],
+                    title='📤 % Envio por Analista',
+                    text=df_dashboard['% Envio'].apply(lambda x: f'{x:.1f}%')
+                )
+                fig_envio.update_traces(textposition='outside')
+                fig_envio.update_layout(height=400)
+                st.plotly_chart(fig_envio, use_container_width=True)
+            
+            with col4:
                 fig_scatter = px.scatter(
                     df_dashboard,
                     x='💬 Atendimentos',
@@ -969,15 +1176,33 @@ def main():
                 fig_scatter.update_layout(height=400)
                 st.plotly_chart(fig_scatter, use_container_width=True)
             
-            with col4:
-                status_counts = df_dashboard['Status'].value_counts()
+            # Distribuição de Status
+            st.subheader("📊 Distribuição de Status")
+            status_counts = df_dashboard['Status'].value_counts()
+            col1, col2 = st.columns(2)
+            
+            with col1:
                 fig_pie = px.pie(
                     values=status_counts.values,
                     names=status_counts.index,
-                    title='📊 Distribuição de Status'
+                    title='Distribuição de Status',
+                    color_discrete_map={
+                        '🟢 Meta Superada': '#28a745',
+                        '🟡 Atenção': '#ffc107',
+                        '🔴 Crítico': '#dc3545'
+                    }
                 )
                 fig_pie.update_layout(height=400)
                 st.plotly_chart(fig_pie, use_container_width=True)
+            
+            with col2:
+                # Tabela resumo dos status
+                status_df = pd.DataFrame({
+                    'Status': status_counts.index,
+                    'Quantidade': status_counts.values,
+                    '%': (status_counts.values / len(df_dashboard) * 100).round(1)
+                })
+                st.dataframe(status_df, use_container_width=True, hide_index=True)
         
         st.markdown("---")
         
@@ -987,9 +1212,12 @@ def main():
         podio = calcular_podio(resultados, gestor_logado, media_atendimentos)
         
         if supabase:
-            podio_manual = carregar_podio_manual(supabase, periodo, gestor_logado)
-            if podio_manual:
-                podio = podio_manual
+            try:
+                podio_manual = carregar_podio_manual(supabase, periodo, gestor_logado)
+                if podio_manual:
+                    podio = podio_manual
+            except Exception as e:
+                st.warning(f"Não foi possível carregar o pódio manual: {str(e)}")
         
         with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
             st.info("Ajuste manualmente os resultados do pódio se necessário.")
@@ -1023,19 +1251,27 @@ def main():
             with col1:
                 if podio_manual and st.button("💾 Salvar Pódio Manual"):
                     if supabase:
-                        if salvar_podio_manual(supabase, periodo, gestor_logado, podio_manual):
-                            podio = podio_manual
-                            st.success("✅ Pódio manual salvo com sucesso!")
-                            st.rerun()
+                        try:
+                            if salvar_podio_manual(supabase, periodo, gestor_logado, podio_manual):
+                                podio = podio_manual
+                                st.success("✅ Pódio manual salvo com sucesso!")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao salvar pódio: {str(e)}")
                     else:
                         st.error("❌ Supabase não configurado.")
             
             with col2:
                 if st.button("🔄 Resetar Pódio"):
                     if supabase:
-                        supabase.table('podio_manual').delete().eq('mes_ano', periodo).eq('gestor', gestor_logado).execute()
-                        st.success("✅ Pódio resetado!")
-                        st.rerun()
+                        try:
+                            supabase.table('podio_manual').delete().eq('mes_ano', periodo).eq('gestor', gestor_logado).execute()
+                            st.success("✅ Pódio resetado!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao resetar pódio: {str(e)}")
+                    else:
+                        st.error("❌ Supabase não configurado.")
         
         if podio:
             col1, col2, col3 = st.columns(3)
@@ -1074,6 +1310,7 @@ def main():
                 'Delta': f"{dados['delta_csat']:+.2f}%",
                 '% Avaliações': f"{dados['perc_avaliacoes']:.2f}%",
                 'Meta Avaliações': f"{dados['meta_geral']:.0f}%",
+                '% Envio': f"{dados['perc_envio']:.2f}%",
                 '💬 Atendimentos': dados['total_atendimentos'],
                 'Média Operação': f"{media_atendimentos:.0f}",
                 'Status': dados['status']
@@ -1108,14 +1345,38 @@ def main():
                     posicao_podio = i
                     break
             
-            feedback = gerar_feedback_mimo(
-                analista_selecionado,
-                dados,
-                media_atendimentos,
-                posicao_podio
+            # Observações do gestor para o feedback
+            with st.expander("📝 Observações do Gestor", expanded=False):
+                observacoes = st.text_area(
+                    "Adicione observações para o feedback:",
+                    height=150,
+                    placeholder="Ex: Colaborador teve dificuldade com atendimentos complexos no início do mês, mas evoluiu significativamente..."
+                )
+            
+            # Gerar feedback com IA
+            usar_ia = st.checkbox(
+                "🤖 Gerar feedback com IA (requer API Gemini configurada)",
+                value=False
             )
             
-            with st.expander("✏️ Editar Feedback (Padrão MIMO)", expanded=False):
+            if usar_ia:
+                with st.spinner("Gerando feedback com IA..."):
+                    feedback = gerar_feedback_ia(
+                        analista_selecionado,
+                        dados,
+                        media_atendimentos,
+                        observacoes if observacoes else "",
+                        posicao_podio
+                    )
+            else:
+                feedback = gerar_feedback_mimo(
+                    analista_selecionado,
+                    dados,
+                    media_atendimentos,
+                    posicao_podio
+                )
+            
+            with st.expander("✏️ Editar Feedback", expanded=False):
                 feedback_editado = st.text_area(
                     "Edite o feedback abaixo:",
                     value=feedback,
@@ -1138,6 +1399,7 @@ def main():
 
 - **CSAT:** {dados['csat']:.2f}%
 - **Avaliações:** {dados['perc_avaliacoes']:.2f}% ({dados['positivos']} positivos + {dados['negativos']} negativos = {dados['avaliacoes']})
+- **% Envio:** {dados['perc_envio']:.2f}%
 - **Atendidos:** {dados['total_atendimentos']} - {dados['total_inativos']} = {dados['validos']}
 - **Média por agente:** {media_atendimentos}
 
@@ -1189,7 +1451,7 @@ def main():
     st.markdown(
         """
         <div style="text-align: center; color: #666; font-size: 12px;">
-            Sistema de Performance v4.0 | Supabase + Histórico
+            Sistema de Performance v5.0 | Supabase + IA + Histórico
         </div>
         """,
         unsafe_allow_html=True
