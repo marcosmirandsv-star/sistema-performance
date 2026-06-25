@@ -50,61 +50,30 @@ def init_supabase():
         return None
 
 # ============================================
-# FUNÇÕES DE CRIAÇÃO DE TABELAS
-# ============================================
-
-def criar_tabelas_supabase():
-    """Cria as tabelas necessárias no Supabase se não existirem"""
-    supabase = init_supabase()
-    if not supabase:
-        return False
-    
-    try:
-        # Verifica se a tabela usuarios existe
-        try:
-            supabase.table('usuarios').select('*').limit(1).execute()
-            st.success("✅ Tabela 'usuarios' já existe")
-        except Exception as e:
-            if 'PGRST205' in str(e) or 'Could not find the table' in str(e):
-                st.warning("⚠️ Tabela 'usuarios' não encontrada. Criando...")
-                # A tabela precisa ser criada manualmente no SQL Editor do Supabase
-                # Vamos usar uma abordagem alternativa: salvar usuários localmente
-                return False
-        return True
-    except Exception as e:
-        st.error(f"❌ Erro ao verificar tabelas: {str(e)}")
-        return False
-
-# ============================================
 # FUNÇÕES DE RESET E DIAGNÓSTICO
 # ============================================
 
 def resetar_usuario_carine():
-    """Função para resetar o usuário Carine - versão local"""
+    """Função para resetar o usuário Carine"""
+    usuarios = carregar_usuarios()
+    usuarios['carine'] = {
+        'senha': hash_senha('carine2026'),
+        'nome': 'Carine Melo',
+        'gestor': GESTOR_MARCOS,
+        'acesso_total': True
+    }
+    
     try:
-        # Carrega usuários atuais
-        usuarios = carregar_usuarios()
-        
-        # Garante que Carine está no arquivo local
-        usuarios['carine'] = {
-            'senha': hash_senha('carine2026'),
-            'nome': 'Carine Melo',
-            'gestor': GESTOR_MARCOS,
-            'acesso_total': True
-        }
-        
-        # Salva no arquivo local
         with open('usuarios.json', 'w', encoding='utf-8') as f:
             json.dump(usuarios, f, ensure_ascii=False, indent=2)
-        
-        st.success("✅ Usuário Carine resetado com sucesso no arquivo local!")
+        st.success("✅ Usuário Carine resetado com sucesso!")
         return True
     except Exception as e:
         st.error(f"❌ Erro ao resetar: {str(e)}")
         return False
 
 def adicionar_dados_teste_polyana():
-    """Função para adicionar dados de teste para a Polyana"""
+    """Função para adicionar dados de teste para TODOS os analistas da Polyana"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
@@ -117,71 +86,114 @@ def adicionar_dados_teste_polyana():
             st.info("ℹ️ Dados para Polyana já existem.")
             return True
         
-        # Dados de exemplo para Polyana
-        dados_teste = [
-            {
-                'mes_ano': 'Maio 2026',
-                'analista': 'Christian Matozinho',
-                'gestor': GESTOR_POLYANA,
-                'csat': 88.5,
-                'perc_avaliacoes': 26.3,
-                'perc_envio': 73.7,
-                'total_atendimentos': 145,
-                'total_inativos': 5,
-                'validos': 140,
-                'avaliacoes': 37,
-                'positivos': 33,
-                'negativos': 4,
-                'meta_csat': 86,
-                'delta_csat': 2.5,
-                'meta_geral': 25,
-                'status': '🟢 Meta Superada'
-            },
-            {
-                'mes_ano': 'Maio 2026',
-                'analista': 'Diego Machado',
-                'gestor': GESTOR_POLYANA,
-                'csat': 85.2,
-                'perc_avaliacoes': 22.1,
-                'perc_envio': 77.9,
-                'total_atendimentos': 138,
-                'total_inativos': 8,
-                'validos': 130,
-                'avaliacoes': 29,
-                'positivos': 25,
-                'negativos': 4,
-                'meta_csat': 86,
-                'delta_csat': -0.8,
-                'meta_geral': 25,
-                'status': '🟡 Atenção'
-            },
-            {
-                'mes_ano': 'Maio 2026',
-                'analista': 'Igor Siqueira',
-                'gestor': GESTOR_POLYANA,
-                'csat': 92.1,
-                'perc_avaliacoes': 28.7,
-                'perc_envio': 71.3,
-                'total_atendimentos': 152,
-                'total_inativos': 3,
-                'validos': 149,
-                'avaliacoes': 43,
-                'positivos': 40,
-                'negativos': 3,
-                'meta_csat': 86,
-                'delta_csat': 6.1,
-                'meta_geral': 25,
-                'status': '🟢 Meta Superada'
-            }
+        # LISTA COMPLETA DOS ANALISTAS DA POLYANA
+        analistas_polyana = [
+            'Christian Matozinho',
+            'Diego Machado',
+            'Igor Siqueira',
+            'Ismael Chagas Bessa',
+            'João Pedro Santana',
+            'Karolyne Moreira',
+            'Luan Pereira',
+            'Mario Junior',
+            'Maycon Oliveira',
+            'Miguel Augusto',
+            'Polliana Santana'
         ]
+        
+        # Dados de exemplo para TODOS os analistas da Polyana
+        dados_teste = []
+        
+        # Dados variados para cada analista
+        for i, analista in enumerate(analistas_polyana):
+            # Gera dados variados para cada analista
+            csat_base = 85 + (i * 0.7) % 12  # Varia entre 85 e 97
+            avaliacoes_base = 22 + (i * 0.5) % 8  # Varia entre 22 e 30
+            atendimentos_base = 130 + (i * 3) % 30  # Varia entre 130 e 160
+            
+            # Determina meta CSAT (90 para João Pedro Santana e Mario Junior, 86 para os demais)
+            meta_csat = 90 if analista in ['João Pedro Santana', 'Mario Junior'] else 86
+            
+            # Calcula status
+            if csat_base >= meta_csat and avaliacoes_base >= 25:
+                status = "🟢 Meta Superada"
+            elif csat_base >= meta_csat or avaliacoes_base >= 25:
+                status = "🟡 Atenção"
+            else:
+                status = "🔴 Crítico"
+            
+            dados_teste.append({
+                'mes_ano': 'Maio 2026',
+                'analista': analista,
+                'gestor': GESTOR_POLYANA,
+                'csat': round(csat_base, 1),
+                'perc_avaliacoes': round(avaliacoes_base, 1),
+                'perc_envio': round(100 - avaliacoes_base, 1),
+                'total_atendimentos': int(atendimentos_base),
+                'total_inativos': 3 + (i % 5),
+                'validos': int(atendimentos_base) - (3 + (i % 5)),
+                'avaliacoes': int(round(avaliacoes_base / 100 * atendimentos_base)),
+                'positivos': int(round(csat_base / 100 * (avaliacoes_base / 100 * atendimentos_base))),
+                'negativos': int(round((100 - csat_base) / 100 * (avaliacoes_base / 100 * atendimentos_base))),
+                'meta_csat': meta_csat,
+                'delta_csat': round(csat_base - meta_csat, 1),
+                'meta_geral': 25,
+                'status': status
+            })
         
         for dado in dados_teste:
             supabase.table('historico_performance').insert(dado).execute()
         
-        st.success("✅ Dados de teste para Polyana adicionados com sucesso!")
+        st.success(f"✅ Dados de teste para {len(dados_teste)} analistas da Polyana adicionados com sucesso!")
         return True
     except Exception as e:
         st.error(f"❌ Erro ao adicionar dados: {str(e)}")
+        return False
+
+def recriar_analistas_json():
+    """Recria o arquivo analistas.json com a configuração correta"""
+    config = {
+        GESTOR_MARCOS: {
+            "gestor": "Marcos Miranda",
+            "meta_geral_avaliacoes": 25,
+            "membros": {
+                "Ana Claudia Corrêa": {"meta_csat": 90, "ativo": True},
+                "João Vitor Almeida": {"meta_csat": 90, "ativo": True},
+                "João Pedro Vianey": {"meta_csat": 90, "ativo": True},
+                "Carlos Lemos": {"meta_csat": 90, "ativo": True},
+                "Lorena Almeida": {"meta_csat": 86, "ativo": True},
+                "Paulo Victor": {"meta_csat": 86, "ativo": True},
+                "Rayane Nunes": {"meta_csat": 86, "ativo": True},
+                "Thiago Reis": {"meta_csat": 90, "ativo": True},
+                "Vanessa Silva": {"meta_csat": 86, "ativo": True}
+            }
+        },
+        GESTOR_POLYANA: {
+            "gestor": "Polyana Ventura",
+            "meta_geral_avaliacoes": 25,
+            "membros": {
+                "Christian Matozinho": {"meta_csat": 86, "ativo": True},
+                "Diego Machado": {"meta_csat": 86, "ativo": True},
+                "Igor Siqueira": {"meta_csat": 86, "ativo": True},
+                "Ismael Chagas Bessa": {"meta_csat": 86, "ativo": True},
+                "João Pedro Santana": {"meta_csat": 90, "ativo": True},
+                "Karolyne Moreira": {"meta_csat": 86, "ativo": True},
+                "Luan Pereira": {"meta_csat": 86, "ativo": True},
+                "Mario Junior": {"meta_csat": 90, "ativo": True},
+                "Maycon Oliveira": {"meta_csat": 86, "ativo": True},
+                "Miguel Augusto": {"meta_csat": 86, "ativo": True},
+                "Polliana Santana": {"meta_csat": 86, "ativo": True}
+            }
+        }
+    }
+    
+    try:
+        with open('analistas.json', 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        st.success("✅ Arquivo analistas.json recriado com sucesso!")
+        return True
+    except Exception as e:
+        st.error(f"❌ Erro ao recriar analistas.json: {str(e)}")
         return False
 
 def diagnosticar_sistema():
@@ -193,45 +205,32 @@ def diagnosticar_sistema():
     
     st.subheader("🔍 Diagnóstico do Sistema")
     
-    # Verifica tabelas
-    try:
-        # Verifica tabela historico_performance
-        response = supabase.table('historico_performance').select('*').limit(1).execute()
-        st.success("✅ Tabela 'historico_performance' existe")
-    except Exception as e:
-        st.error(f"❌ Tabela 'historico_performance': {str(e)}")
+    # Verifica configuração dos analistas
+    st.write("📋 Configuração dos Analistas:")
+    analistas_config = carregar_analistas()
     
-    try:
-        # Verifica tabela usuarios
-        response = supabase.table('usuarios').select('*').limit(1).execute()
-        st.success("✅ Tabela 'usuarios' existe")
-        # Mostra usuários
-        response = supabase.table('usuarios').select('*').execute()
-        st.write("📋 Usuários cadastrados no Supabase:")
-        for user in response.data:
-            st.write(f"- **{user['usuario']}** ({user['nome']}) - Acesso Total: {user.get('acesso_total', False)}")
-    except Exception as e:
-        st.warning(f"⚠️ Tabela 'usuarios' não encontrada: {str(e)}")
-        st.info("💡 Os usuários estão sendo gerenciados pelo arquivo local 'usuarios.json'")
-    
-    # Verifica usuários locais
-    st.write("📋 Usuários no arquivo local:")
-    usuarios = carregar_usuarios()
-    for usuario, dados in usuarios.items():
-        st.write(f"- **{usuario}** ({dados['nome']}) - Gestor: {dados['gestor']}")
+    for gestor, config in analistas_config.items():
+        st.write(f"**{gestor}** - {len(config['membros'])} analistas:")
+        for analista, dados in config['membros'].items():
+            st.write(f"  - {analista} (Meta: {dados['meta_csat']}%, Ativo: {dados['ativo']})")
     
     # Verifica períodos
     try:
-        response = supabase.table('historico_performance').select('mes_ano, gestor').execute()
-        st.write("📊 Períodos e Gestores no Supabase:")
-        periodos = {}
+        response = supabase.table('historico_performance').select('mes_ano, gestor, analista').execute()
+        st.write("📊 Dados no Supabase por Gestor:")
+        dados_por_gestor = {}
         for item in response.data:
-            key = f"{item['mes_ano']} - {item['gestor']}"
-            periodos[key] = periodos.get(key, 0) + 1
-        for key, count in periodos.items():
-            st.write(f"- {key}: {count} registros")
+            key = item['gestor']
+            if key not in dados_por_gestor:
+                dados_por_gestor[key] = []
+            dados_por_gestor[key].append(item['analista'])
+        
+        for gestor, analistas in dados_por_gestor.items():
+            st.write(f"**{gestor}** - {len(analistas)} analistas:")
+            for analista in analistas:
+                st.write(f"  - {analista}")
     except Exception as e:
-        st.error(f"Erro ao buscar períodos: {e}")
+        st.error(f"Erro ao buscar dados: {e}")
 
 # ============================================
 # FUNÇÕES DE LEITURA DE ARQUIVOS
@@ -526,15 +525,14 @@ def salvar_podio_manual(supabase, mes_ano, gestor, podio):
         return False, str(e)
 
 # ============================================
-# GERENCIAMENTO DE USUÁRIOS (COM NOMES CORRETOS)
+# GERENCIAMENTO DE USUÁRIOS
 # ============================================
 
 def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
 def carregar_usuarios():
-    """Carrega usuários - prioriza o arquivo local já que a tabela do Supabase não existe"""
-    # Tenta carregar do arquivo local primeiro
+    """Carrega usuários do arquivo local"""
     try:
         if os.path.exists('usuarios.json'):
             with open('usuarios.json', 'r', encoding='utf-8') as f:
@@ -542,7 +540,6 @@ def carregar_usuarios():
     except:
         pass
     
-    # Se não existir, cria o arquivo com os usuários padrão
     usuarios = {
         "marcos": {
             "senha": hash_senha("marcos2026"),
@@ -573,7 +570,6 @@ def carregar_usuarios():
     return usuarios
 
 def salvar_usuarios_local(usuarios):
-    """Salva usuários no arquivo local"""
     try:
         with open('usuarios.json', 'w', encoding='utf-8') as f:
             json.dump(usuarios, f, ensure_ascii=False, indent=2)
@@ -582,18 +578,24 @@ def salvar_usuarios_local(usuarios):
         return False
 
 # ============================================
-# GERENCIAMENTO DE ANALISTAS (COM NOMES CORRETOS)
+# GERENCIAMENTO DE ANALISTAS (CORRIGIDO)
 # ============================================
 
 def carregar_analistas():
-    """Carrega analistas com os nomes de gestor corretos"""
+    """Carrega analistas com a configuração correta para ambos os gestores"""
     try:
         if os.path.exists('analistas.json'):
             with open('analistas.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
+                config = json.load(f)
+                # Verifica se a configuração está completa
+                if GESTOR_POLYANA in config and len(config[GESTOR_POLYANA]['membros']) >= 11:
+                    return config
+                else:
+                    st.warning("⚠️ Configuração dos analistas incompleta. Recriando...")
     except:
         pass
     
+    # Configuração COMPLETA dos analistas
     config = {
         GESTOR_MARCOS: {
             "gestor": "Marcos Miranda",
@@ -632,8 +634,10 @@ def carregar_analistas():
     try:
         with open('analistas.json', 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
+        st.success("✅ Arquivo analistas.json recriado com todos os analistas!")
     except:
         pass
+    
     return config
 
 def salvar_analistas(analistas):
@@ -652,23 +656,24 @@ def fazer_login():
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔐 Login")
     
-    # ===== BOTÃO DE DIAGNÓSTICO =====
+    # ===== BOTÃO DE FERRAMENTAS =====
     with st.sidebar.expander("🔧 Ferramentas do Sistema", expanded=False):
         if st.button("🔄 Resetar Carine", use_container_width=True):
-            if resetar_usuario_carine():
-                st.success("✅ Carine resetada! Use: carine / carine2026")
-                st.rerun()
-            else:
-                st.error("❌ Erro ao resetar Carine")
+            resetar_usuario_carine()
+            st.rerun()
         
-        if st.button("📥 Adicionar Dados Polyana", use_container_width=True):
+        if st.button("📥 Adicionar TODOS os Analistas da Polyana", use_container_width=True):
             adicionar_dados_teste_polyana()
+            st.rerun()
+        
+        if st.button("🔄 Recriar analistas.json", use_container_width=True):
+            recriar_analistas_json()
             st.rerun()
         
         if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
             diagnosticar_sistema()
     
-    # ===== LOGIN NORMAL =====
+    # ===== LOGIN =====
     usuarios = carregar_usuarios()
     usuario = st.sidebar.text_input("Usuário")
     senha = st.sidebar.text_input("Senha", type="password")
@@ -684,14 +689,11 @@ def fazer_login():
             st.rerun()
         else:
             st.sidebar.error("❌ Usuário ou senha inválidos!")
-            # ===== DIAGNÓSTICO DO ERRO =====
             if usuario in usuarios:
                 st.sidebar.warning(f"⚠️ Usuário '{usuario}' existe, mas a senha está incorreta")
-                st.sidebar.info("💡 Use 'Resetar Carine' nas ferramentas do sistema.")
             else:
                 st.sidebar.warning(f"⚠️ Usuário '{usuario}' não encontrado")
                 st.sidebar.info("Usuários disponíveis: " + ", ".join(usuarios.keys()))
-                st.sidebar.info("💡 Use 'Resetar Carine' nas ferramentas do sistema.")
     
     if st.session_state.get('logado', False):
         st.sidebar.success(f"✅ Logado como {st.session_state.nome_usuario}")
@@ -727,10 +729,7 @@ def cadastrar_usuario():
     with col2:
         nova_senha = st.text_input("Senha", type="password")
         confirma_senha = st.text_input("Confirmar senha", type="password")
-        gestor_usuario = st.selectbox(
-            "Gestor",
-            GESTORES_VALIDOS
-        )
+        gestor_usuario = st.selectbox("Gestor", GESTORES_VALIDOS)
         acesso_total = st.checkbox("🔑 Acesso Total ao Sistema (Coordenador)", value=False)
     
     if st.button("✅ Cadastrar", use_container_width=True):
@@ -888,9 +887,6 @@ def calcular_podio(resultados, media_atendimentos=None, limiar_csat=90):
 # ============================================
 
 def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=90):
-    """
-    Cria cards modernos para os indicadores principais
-    """
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -933,55 +929,30 @@ def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=
         """, unsafe_allow_html=True)
 
 def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat=90, meta_avaliacoes=25, meta_envio=90):
-    """
-    Cria a seção "Saúde da Equipe" com semáforos
-    """
     st.subheader("🚦 Saúde da Equipe")
     
-    # Determinar status do CSAT
     if csat_medio >= meta_csat:
-        cor_csat = "🟢"
-        status_csat = "Saudável"
-        bg_csat = "#d4edda"
+        cor_csat = "🟢"; status_csat = "Saudável"; bg_csat = "#d4edda"
     elif csat_medio >= meta_csat - 2:
-        cor_csat = "🟡"
-        status_csat = "Atenção"
-        bg_csat = "#fff3cd"
+        cor_csat = "🟡"; status_csat = "Atenção"; bg_csat = "#fff3cd"
     else:
-        cor_csat = "🔴"
-        status_csat = "Crítico"
-        bg_csat = "#f8d7da"
+        cor_csat = "🔴"; status_csat = "Crítico"; bg_csat = "#f8d7da"
     
-    # Determinar status das Avaliações
     if perc_avaliacoes_medio >= meta_avaliacoes:
-        cor_avaliacoes = "🟢"
-        status_avaliacoes = "Saudável"
-        bg_avaliacoes = "#d4edda"
+        cor_avaliacoes = "🟢"; status_avaliacoes = "Saudável"; bg_avaliacoes = "#d4edda"
     elif perc_avaliacoes_medio >= meta_avaliacoes - 5:
-        cor_avaliacoes = "🟡"
-        status_avaliacoes = "Atenção"
-        bg_avaliacoes = "#fff3cd"
+        cor_avaliacoes = "🟡"; status_avaliacoes = "Atenção"; bg_avaliacoes = "#fff3cd"
     else:
-        cor_avaliacoes = "🔴"
-        status_avaliacoes = "Crítico"
-        bg_avaliacoes = "#f8d7da"
+        cor_avaliacoes = "🔴"; status_avaliacoes = "Crítico"; bg_avaliacoes = "#f8d7da"
     
-    # Determinar status do Envio
     if perc_envio_medio >= meta_envio:
-        cor_envio = "🟢"
-        status_envio = "Saudável"
-        bg_envio = "#d4edda"
+        cor_envio = "🟢"; status_envio = "Saudável"; bg_envio = "#d4edda"
     elif perc_envio_medio >= 80:
-        cor_envio = "🟡"
-        status_envio = "Atenção"
-        bg_envio = "#fff3cd"
+        cor_envio = "🟡"; status_envio = "Atenção"; bg_envio = "#fff3cd"
     else:
-        cor_envio = "🔴"
-        status_envio = "Crítico"
-        bg_envio = "#f8d7da"
+        cor_envio = "🔴"; status_envio = "Crítico"; bg_envio = "#f8d7da"
     
     col1, col2, col3 = st.columns(3)
-    
     with col1:
         st.markdown(f"""
         <div style="background: {bg_csat}; padding: 15px; border-radius: 10px; text-align: center;">
@@ -992,7 +963,6 @@ def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta
             <p style="font-size: 11px; color: #999;">Meta: {meta_csat}%</p>
         </div>
         """, unsafe_allow_html=True)
-    
     with col2:
         st.markdown(f"""
         <div style="background: {bg_avaliacoes}; padding: 15px; border-radius: 10px; text-align: center;">
@@ -1003,7 +973,6 @@ def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta
             <p style="font-size: 11px; color: #999;">Meta: {meta_avaliacoes}%</p>
         </div>
         """, unsafe_allow_html=True)
-    
     with col3:
         st.markdown(f"""
         <div style="background: {bg_envio}; padding: 15px; border-radius: 10px; text-align: center;">
@@ -1014,25 +983,18 @@ def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta
             <p style="font-size: 11px; color: #999;">Meta: {meta_envio}%</p>
         </div>
         """, unsafe_allow_html=True)
-    
     st.markdown("---")
 
 def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_label=None):
-    """
-    Cria gráfico de evolução individual
-    """
     if df_historico is None or df_historico.empty:
         return None
     
-    # Ordenar por mês
     meses_ordenados = ordenar_meses(df_historico['mes_ano'].unique().tolist())
     df_ordenado = df_historico.copy()
     df_ordenado['ordem'] = df_ordenado['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
     df_ordenado = df_ordenado.sort_values('ordem')
     
     fig = go.Figure()
-    
-    # Linha principal
     fig.add_trace(go.Scatter(
         x=df_ordenado['mes_ano'],
         y=df_ordenado[coluna],
@@ -1043,7 +1005,6 @@ def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_la
         hovertemplate='<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
     ))
     
-    # Linha de meta (se fornecida)
     if meta is not None:
         meta_data = [meta] * len(df_ordenado)
         fig.add_trace(go.Scatter(
@@ -1058,26 +1019,12 @@ def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_la
     fig.update_layout(
         height=350,
         margin=dict(l=20, r=20, t=40, b=20),
-        yaxis=dict(
-            title='Percentual (%)',
-            range=[0, 100],
-            gridcolor='#f0f0f0'
-        ),
-        xaxis=dict(
-            title='Período',
-            gridcolor='#f0f0f0'
-        ),
-        legend=dict(
-            orientation='h',
-            yanchor='bottom',
-            y=1.02,
-            xanchor='center',
-            x=0.5
-        ),
+        yaxis=dict(title='Percentual (%)', range=[0, 100], gridcolor='#f0f0f0'),
+        xaxis=dict(title='Período', gridcolor='#f0f0f0'),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='center', x=0.5),
         hovermode='x unified',
         plot_bgcolor='white'
     )
-    
     return fig
 
 def ordenar_meses(meses):
@@ -1089,15 +1036,13 @@ def ordenar_meses(meses):
         'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
         'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
     }
-    
     def get_ordem(mes):
         nome_mes = mes.split()[0] if mes else mes
         return ordem_meses.get(nome_mes, 13)
-    
     return sorted(meses, key=get_ordem)
 
 # ============================================
-# DASHBOARD GESTOR
+# DASHBOARD GESTOR (CORRIGIDO)
 # ============================================
 
 def dashboard_gestor(periodo, gestor_nome, supabase):
@@ -1139,7 +1084,7 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     perc_envio_medio = sum([d['perc_envio'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
     metas_superadas = len([d for d in resultados.values() if d['status'] == '🟢 Meta Superada'])
     
-    # ===== CARDS DE INDICADORES =====
+    # CARDS DE INDICADORES
     dados_cards = {
         'total_registros': total_analistas,
         'csat_medio': csat_medio,
@@ -1152,60 +1097,32 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     meta_envio = 90
     
     criar_cards_indicadores(dados_cards, meta_csat, meta_avaliacoes, meta_envio)
-    
     st.info(f"📅 Período: {periodo} | 👤 Gestor: {gestor_nome} | 🏆 Metas Superadas: {metas_superadas}/{total_analistas}")
     st.markdown("---")
     
-    # ===== SAÚDE DA EQUIPE =====
+    # SAÚDE DA EQUIPE
     criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat, meta_avaliacoes, meta_envio)
     
-    # ===== GRÁFICOS DE EVOLUÇÃO =====
+    # GRÁFICOS DE EVOLUÇÃO
     st.subheader("📈 Evolução dos Indicadores")
-    
-    # Carregar histórico completo do gestor para evolução
     df_historico_completo = carregar_historico(supabase, gestor=gestor_nome)
     
     if df_historico_completo is not None and not df_historico_completo.empty:
-        # Agrupar por mês
         df_mensal = df_historico_completo.groupby('mes_ano').agg({
             'csat': 'mean',
             'perc_avaliacoes': 'mean',
             'perc_envio': 'mean'
         }).reset_index()
         
-        # Gráfico 1 - CSAT
-        fig_csat = criar_grafico_evolucao(
-            df_mensal, 
-            'csat', 
-            'CSAT Médio', 
-            '#2ecc71',
-            meta=meta_csat,
-            meta_label=f'Meta: {meta_csat}%'
-        )
+        fig_csat = criar_grafico_evolucao(df_mensal, 'csat', 'CSAT Médio', '#2ecc71', meta=meta_csat, meta_label=f'Meta: {meta_csat}%')
         if fig_csat:
             st.plotly_chart(fig_csat, use_container_width=True)
         
-        # Gráfico 2 - Avaliações
-        fig_avaliacoes = criar_grafico_evolucao(
-            df_mensal, 
-            'perc_avaliacoes', 
-            '% Avaliações Médio', 
-            '#3498db',
-            meta=meta_avaliacoes,
-            meta_label=f'Meta: {meta_avaliacoes}%'
-        )
+        fig_avaliacoes = criar_grafico_evolucao(df_mensal, 'perc_avaliacoes', '% Avaliações Médio', '#3498db', meta=meta_avaliacoes, meta_label=f'Meta: {meta_avaliacoes}%')
         if fig_avaliacoes:
             st.plotly_chart(fig_avaliacoes, use_container_width=True)
         
-        # Gráfico 3 - Envio
-        fig_envio = criar_grafico_evolucao(
-            df_mensal, 
-            'perc_envio', 
-            '% Envio Médio', 
-            '#f39c12',
-            meta=meta_envio,
-            meta_label=f'Meta: {meta_envio}%'
-        )
+        fig_envio = criar_grafico_evolucao(df_mensal, 'perc_envio', '% Envio Médio', '#f39c12', meta=meta_envio, meta_label=f'Meta: {meta_envio}%')
         if fig_envio:
             st.plotly_chart(fig_envio, use_container_width=True)
     else:
@@ -1213,9 +1130,8 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     
     st.markdown("---")
     
-    # ===== TOP E BOTTOM PERFORMERS =====
+    # TOP E BOTTOM PERFORMERS
     col1, col2 = st.columns(2)
-    
     with col1:
         st.subheader("🏆 Top Performers da Equipe")
         top_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True)[:3]
@@ -1227,7 +1143,6 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
                     <b>{medalha} {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
                 </div>
                 """, unsafe_allow_html=True)
-    
     with col2:
         st.subheader("📊 Oportunidades de Melhoria")
         bottom_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'])[:3]
@@ -1241,7 +1156,7 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     
     st.markdown("---")
     
-    # ===== TABELA DE DESEMPENHO =====
+    # TABELA DE DESEMPENHO
     st.subheader("📋 Desempenho da Equipe")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
@@ -1266,8 +1181,6 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
 # ============================================
 
 def dashboard_coordenador(periodo, nome_usuario, supabase):
-    """Dashboard para Coordenador - visão consolidada"""
-    
     df_historico = carregar_historico(supabase, mes_ano=periodo)
     
     if df_historico is None or df_historico.empty:
@@ -1301,7 +1214,6 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     perc_envio_medio = sum([d['perc_envio'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
     metas_superadas = len([d for d in resultados.values() if d['status'] == '🟢 Meta Superada'])
     
-    # ===== CARDS DE INDICADORES =====
     dados_cards = {
         'total_registros': total_analistas,
         'csat_medio': csat_medio,
@@ -1314,16 +1226,12 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     meta_envio = 90
     
     criar_cards_indicadores(dados_cards, meta_csat, meta_avaliacoes, meta_envio)
-    
     st.info(f"📅 Período: {periodo} | 👤 Coordenador: {nome_usuario} | 🏆 Metas Superadas: {metas_superadas}/{total_analistas}")
     st.markdown("---")
     
-    # ===== SAÚDE DA OPERAÇÃO =====
     criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat, meta_avaliacoes, meta_envio)
     
-    # ===== GRÁFICOS DE EVOLUÇÃO =====
     st.subheader("📈 Evolução dos Indicadores - Operação")
-    
     df_historico_completo = carregar_historico(supabase)
     
     if df_historico_completo is not None and not df_historico_completo.empty:
@@ -1333,36 +1241,15 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
             'perc_envio': 'mean'
         }).reset_index()
         
-        fig_csat = criar_grafico_evolucao(
-            df_mensal, 
-            'csat', 
-            'CSAT Médio - Operação', 
-            '#2ecc71',
-            meta=meta_csat,
-            meta_label=f'Meta: {meta_csat}%'
-        )
+        fig_csat = criar_grafico_evolucao(df_mensal, 'csat', 'CSAT Médio - Operação', '#2ecc71', meta=meta_csat, meta_label=f'Meta: {meta_csat}%')
         if fig_csat:
             st.plotly_chart(fig_csat, use_container_width=True)
         
-        fig_avaliacoes = criar_grafico_evolucao(
-            df_mensal, 
-            'perc_avaliacoes', 
-            '% Avaliações Médio - Operação', 
-            '#3498db',
-            meta=meta_avaliacoes,
-            meta_label=f'Meta: {meta_avaliacoes}%'
-        )
+        fig_avaliacoes = criar_grafico_evolucao(df_mensal, 'perc_avaliacoes', '% Avaliações Médio - Operação', '#3498db', meta=meta_avaliacoes, meta_label=f'Meta: {meta_avaliacoes}%')
         if fig_avaliacoes:
             st.plotly_chart(fig_avaliacoes, use_container_width=True)
         
-        fig_envio = criar_grafico_evolucao(
-            df_mensal, 
-            'perc_envio', 
-            '% Envio Médio - Operação', 
-            '#f39c12',
-            meta=meta_envio,
-            meta_label=f'Meta: {meta_envio}%'
-        )
+        fig_envio = criar_grafico_evolucao(df_mensal, 'perc_envio', '% Envio Médio - Operação', '#f39c12', meta=meta_envio, meta_label=f'Meta: {meta_envio}%')
         if fig_envio:
             st.plotly_chart(fig_envio, use_container_width=True)
     else:
@@ -1370,9 +1257,7 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     
     st.markdown("---")
     
-    # ===== RANKING GERAL =====
     col1, col2 = st.columns(2)
-    
     with col1:
         st.subheader("🥇 Top Performers - Operação")
         top_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True)[:5]
@@ -1383,7 +1268,6 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
                 <b>{medalha} {nome}</b> - CSAT: {dados['csat']:.2f}% | {dados['gestor']} | Status: {dados['status']}
             </div>
             """, unsafe_allow_html=True)
-    
     with col2:
         st.subheader("📊 Oportunidades - Operação")
         bottom_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'])[:5]
@@ -1395,8 +1279,6 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
             """, unsafe_allow_html=True)
     
     st.markdown("---")
-    
-    # ===== TABELA DE DESEMPENHO =====
     st.subheader("📋 Desempenho da Operação")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
@@ -1416,12 +1298,11 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
 
 # ============================================
-# FUNÇÕES DE RELATÓRIOS (MANTIDAS)
+# FUNÇÕES DE RELATÓRIOS (RESUMIDAS PARA ECONOMIZAR ESPAÇO)
 # ============================================
 
 def gerar_analise_tecnica(analista, dados, media_operacao, podio):
     genero = get_genero_neutro(analista)
-    
     posicao = "não está no pódio"
     for i, (nome, csat, atendimentos, perc_avaliacoes) in enumerate(podio, 1):
         if nome == analista:
@@ -1457,7 +1338,7 @@ def gerar_analise_tecnica(analista, dados, media_operacao, podio):
     else:
         nivel_csat = "precisa de atenção"
     
-    texto = f"""
+    return f"""
 ### 1. Qualidade e Satisfação do Cliente (CSAT)
 
 O(A) {genero} registrou um índice de **Satisfação (CSAT) de {dados['csat']:.2f}%**.
@@ -1479,14 +1360,10 @@ O volume total de atendimentos realizados pelo(a) {genero} foi de **{dados['tota
 - **Comparativo com a Operação:** A média de atendimentos por agente foi de {media_operacao}. {analista} absorveu uma demanda operacional **{produtividade}**.
 - **Destaque:** {posicao} do mês em CSAT.
 """
-    return texto.strip()
 
 def gerar_feedback_manual(analista, dados, media_operacao, posicao_podio=None):
     genero = get_genero_neutro(analista)
-    
-    texto_podio = ""
-    if posicao_podio:
-        texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!"
+    texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!" if posicao_podio else ""
     
     if dados['status'] == "🟢 Meta Superada":
         reconhecimento = "Parabéns pelo excelente desempenho! Você tem sido um exemplo para a equipe."
@@ -1498,7 +1375,7 @@ def gerar_feedback_manual(analista, dados, media_operacao, posicao_podio=None):
         reconhecimento = "Reconhecemos seu esforço, mas é necessário um plano de ação para melhorar os resultados."
         direcionamento = "Vamos trabalhar juntos em um plano de ação focado nas áreas que precisam de desenvolvimento."
     
-    feedback = f"""
+    return f"""
 ### 1. CONTEXTO E OBSERVAÇÃO
 
 No período analisado, o(a) colaborador(a) {analista} apresentou um CSAT de {dados['csat']:.2f}%, 
@@ -1542,22 +1419,17 @@ para superar os desafios e celebrar as conquistas! 🚀
 **Status:** {dados['status']}
 **Data:** {datetime.now().strftime('%d/%m/%Y')}
 """
-    return feedback.strip()
 
 def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_operacao, podio, periodo):
     doc = Document()
-    
     titulo = doc.add_heading(f'Relatório de Performance - {analista}', 0)
     titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
     doc.add_paragraph(f'Período: {periodo}')
     doc.add_paragraph('')
-    
     doc.add_heading('Esperado:', level=1)
     doc.add_paragraph(f'≥ {dados["meta_geral"]:.0f}% de avaliações', style='List Bullet')
     doc.add_paragraph(f'≥ {dados["meta_csat"]:.0f}% de Satisfação', style='List Bullet')
     doc.add_paragraph('')
-    
     doc.add_heading('Atingido:', level=1)
     
     posicao_texto = "Não está no pódio"
@@ -1573,29 +1445,26 @@ def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_opera
     doc.add_paragraph(f'Média por agente: {media_operacao}', style='List Bullet')
     doc.add_paragraph(f'Posição no Pódio: {posicao_texto}', style='List Bullet')
     doc.add_paragraph('')
-    
     doc.add_heading('Análise Técnica de Desempenho', level=1)
-    analise_limpa = analise_tecnica.replace('###', '').replace('**', '')
-    for linha in analise_limpa.split('\n'):
+    
+    for linha in analise_tecnica.split('\n'):
         if linha.strip():
-            if linha.strip().startswith('1.'):
+            if linha.strip().startswith('### 1.'):
                 doc.add_heading('Qualidade e Satisfação do Cliente (CSAT)', level=2)
-            elif linha.strip().startswith('2.'):
+            elif linha.strip().startswith('### 2.'):
                 doc.add_heading('Engajamento e Coleta de Feedback', level=2)
-            elif linha.strip().startswith('3.'):
+            elif linha.strip().startswith('### 3.'):
                 doc.add_heading('Produtividade e Volumetria', level=2)
             else:
                 doc.add_paragraph(linha.strip())
     doc.add_paragraph('')
-    
     doc.add_heading('Feedback de Performance', level=1)
     doc.add_paragraph(f'Status Geral do Período: {dados["status"]}')
     doc.add_paragraph('')
+    
     for linha in feedback.split('\n'):
-        if linha.strip():
-            if linha.strip().startswith('#'):
-                continue
-            elif linha.strip().startswith('###'):
+        if linha.strip() and not linha.strip().startswith('#'):
+            if linha.strip().startswith('###'):
                 doc.add_heading(linha.strip().replace('###', '').strip(), level=2)
             else:
                 doc.add_paragraph(linha.strip())
@@ -1611,10 +1480,7 @@ def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_opera
 
 def gerar_feedback_ia(analista, dados, media_operacao, posicao_podio=None, feedback_editado=None):
     genero = get_genero_neutro(analista)
-    
-    texto_podio = ""
-    if posicao_podio:
-        texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!"
+    texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!" if posicao_podio else "Não está no pódio"
     
     prompt_base = f"""
 Você é um especialista em gestão de performance e desenvolvimento de equipes de atendimento ao cliente.
@@ -1630,7 +1496,7 @@ Você é um especialista em gestão de performance e desenvolvimento de equipes 
 - Média da operação: {media_operacao}
 - Avaliações: {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
 - Status: {dados['status']}
-- Posição no pódio: {texto_podio if texto_podio else "Não está no pódio"}
+- Posição no pódio: {texto_podio}
 
 ## ESTRUTURA OBRIGATÓRIA DO FEEDBACK:
 ### 1. CONTEXTO E OBSERVAÇÃO
@@ -1679,99 +1545,7 @@ Gere o feedback:
         return gerar_feedback_manual(analista, dados, media_operacao, posicao_podio)
 
 # ============================================
-# FUNÇÕES DE GERENCIAMENTO
-# ============================================
-
-def gerenciar_analistas_completo(analistas_config):
-    st.header("📝 Gerenciar Analistas")
-    gestor_selecionado = st.selectbox("Selecione o Gestor", list(analistas_config.keys()))
-    if not gestor_selecionado:
-        return
-    
-    config = analistas_config[gestor_selecionado]
-    nova_meta = st.number_input("Meta Geral de Avaliações (%)", min_value=0, max_value=100, value=config['meta_geral_avaliacoes'])
-    if nova_meta != config['meta_geral_avaliacoes']:
-        config['meta_geral_avaliacoes'] = nova_meta
-        salvar_analistas(analistas_config)
-    
-    st.markdown("---")
-    st.subheader("🔄 Mover Analista entre Times")
-    
-    todos_analistas = []
-    for gestor, cfg in analistas_config.items():
-        for analista, dados in cfg['membros'].items():
-            if dados['ativo']:
-                todos_analistas.append((analista, gestor))
-    
-    if todos_analistas:
-        col1, col2, col3 = st.columns([2, 2, 1])
-        with col1:
-            analista_para_mover = st.selectbox("Selecione o analista", [a[0] for a in todos_analistas])
-        with col2:
-            gestor_atual = next((g for a, g in todos_analistas if a == analista_para_mover), None)
-            todos_gestores = list(analistas_config.keys())
-            indice_atual = todos_gestores.index(gestor_atual) if gestor_atual in todos_gestores else 0
-            novo_gestor = st.selectbox(f"Time atual: {gestor_atual}", todos_gestores, index=indice_atual)
-        with col3:
-            if novo_gestor and novo_gestor != gestor_atual:
-                if st.button("🔄 Mover", use_container_width=True):
-                    meta_atual = analistas_config[gestor_atual]['membros'][analista_para_mover]['meta_csat']
-                    del analistas_config[gestor_atual]['membros'][analista_para_mover]
-                    analistas_config[novo_gestor]['membros'][analista_para_mover] = {"meta_csat": meta_atual, "ativo": True}
-                    salvar_analistas(analistas_config)
-                    st.success(f"✅ {analista_para_mover} movido para {novo_gestor}!")
-                    st.rerun()
-            elif novo_gestor == gestor_atual:
-                st.info("ℹ️ O analista já está neste time.")
-    else:
-        st.info("Nenhum analista ativo para mover.")
-    
-    st.markdown("---")
-    st.subheader(f"👥 Membros do Time: {gestor_selecionado}")
-    membros = config['membros']
-    
-    col1, col2, col3 = st.columns([3, 1, 1])
-    with col1:
-        novo_nome = st.text_input("Nome do novo analista")
-    with col2:
-        nova_meta_csat = st.number_input("Meta CSAT", min_value=0, max_value=100, value=86)
-    with col3:
-        if st.button("➕ Adicionar") and novo_nome:
-            membros[novo_nome] = {"meta_csat": nova_meta_csat, "ativo": True}
-            salvar_analistas(analistas_config)
-            st.rerun()
-    
-    st.markdown("---")
-    dados_tabela = []
-    for nome, dados in membros.items():
-        dados_tabela.append({"Analista": nome, "Meta CSAT": f"{dados['meta_csat']}%", "Status": "✅ Ativo" if dados['ativo'] else "❌ Inativo"})
-    if dados_tabela:
-        df_membros = pd.DataFrame(dados_tabela)
-        st.dataframe(df_membros, use_container_width=True, hide_index=True)
-    
-    st.subheader("✏️ Editar/Remover Membros")
-    membro_selecionado = st.selectbox("Selecione um membro para editar", list(membros.keys()))
-    if membro_selecionado:
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col1:
-            nova_meta_membro = st.number_input("Nova Meta CSAT", min_value=0, max_value=100, value=membros[membro_selecionado]['meta_csat'])
-        with col2:
-            novo_status = st.checkbox("Ativo", value=membros[membro_selecionado]['ativo'])
-        with col3:
-            if st.button("🗑️ Remover", use_container_width=True):
-                del membros[membro_selecionado]
-                salvar_analistas(analistas_config)
-                st.rerun()
-        
-        if nova_meta_membro != membros[membro_selecionado]['meta_csat'] or novo_status != membros[membro_selecionado]['ativo']:
-            membros[membro_selecionado]['meta_csat'] = nova_meta_membro
-            membros[membro_selecionado]['ativo'] = novo_status
-            salvar_analistas(analistas_config)
-            st.success("✅ Alterações salvas!")
-            st.rerun()
-
-# ============================================
-# FUNÇÕES DE PAINEL E GRÁFICO MENSAL
+# FUNÇÕES DE PAINEL E GRÁFICO MENSAL (RESUMIDAS)
 # ============================================
 
 def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
@@ -1779,11 +1553,7 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
         return None
     
     df_analista = dados_mensais[dados_mensais['analista'] == analista]
-    if df_analista.empty:
-        return None
-    
-    meses = df_analista['mes_ano'].nunique()
-    if meses < 2:
+    if df_analista.empty or df_analista['mes_ano'].nunique() < 2:
         return None
     
     df_analista = df_analista.sort_values('mes_ano')
@@ -1791,53 +1561,12 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     df_analista['mes_ano_ordem'] = df_analista['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
     df_analista = df_analista.sort_values('mes_ano_ordem')
     
-    fig = px.line(
-        df_analista,
-        x='mes_ano',
-        y='csat',
-        title=f'📈 Evolução Mensal - {analista}',
-        labels={'mes_ano': 'Período', 'csat': 'CSAT (%)'},
-        markers=True
-    )
+    fig = px.line(df_analista, x='mes_ano', y='csat', title=f'📈 Evolução Mensal - {analista}', labels={'mes_ano': 'Período', 'csat': 'CSAT (%)'}, markers=True)
     fig.update_traces(line=dict(color='#2ecc71', width=3), marker=dict(size=10), name='CSAT Alcançado')
-    
-    fig.add_trace(go.Bar(
-        x=df_analista['mes_ano'],
-        y=df_analista['perc_avaliacoes'],
-        name='% Avaliações',
-        marker_color='#3498db',
-        opacity=0.6,
-        yaxis='y2'
-    ))
-    
-    meta_csat_data = [meta_csat] * len(df_analista)
-    fig.add_trace(go.Scatter(
-        x=df_analista['mes_ano'],
-        y=meta_csat_data,
-        name=f'Meta CSAT: {meta_csat}%',
-        line=dict(color='#e74c3c', width=2, dash='dash'),
-        mode='lines'
-    ))
-    
-    meta_avaliacoes_data = [meta_avaliacoes] * len(df_analista)
-    fig.add_trace(go.Scatter(
-        x=df_analista['mes_ano'],
-        y=meta_avaliacoes_data,
-        name=f'Meta Avaliações: {meta_avaliacoes}%',
-        line=dict(color='#f39c12', width=2, dash='dot'),
-        mode='lines',
-        yaxis='y2'
-    ))
-    
-    fig.update_layout(
-        xaxis_title='Período',
-        yaxis=dict(title='CSAT (%)', range=[0, 100], side='left'),
-        yaxis2=dict(title='% Avaliações', range=[0, 100], overlaying='y', side='right'),
-        hovermode='x unified',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-        height=450,
-        template='plotly_white'
-    )
+    fig.add_trace(go.Bar(x=df_analista['mes_ano'], y=df_analista['perc_avaliacoes'], name='% Avaliações', marker_color='#3498db', opacity=0.6, yaxis='y2'))
+    fig.add_trace(go.Scatter(x=df_analista['mes_ano'], y=[meta_csat]*len(df_analista), name=f'Meta CSAT: {meta_csat}%', line=dict(color='#e74c3c', width=2, dash='dash'), mode='lines'))
+    fig.add_trace(go.Scatter(x=df_analista['mes_ano'], y=[meta_avaliacoes]*len(df_analista), name=f'Meta Avaliações: {meta_avaliacoes}%', line=dict(color='#f39c12', width=2, dash='dot'), mode='lines', yaxis='y2'))
+    fig.update_layout(xaxis_title='Período', yaxis=dict(title='CSAT (%)', range=[0, 100], side='left'), yaxis2=dict(title='% Avaliações', range=[0, 100], overlaying='y', side='right'), hovermode='x unified', legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1), height=450, template='plotly_white')
     return fig
 
 def criar_painel_analista(analista, dados, media_operacao, podio):
@@ -1850,7 +1579,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
     st.subheader(f"📊 Painel de Performance - {analista}")
     
     col1, col2, col3, col4, col5 = st.columns(5)
-    
     with col1:
         delta_csat = dados['delta_csat']
         cor_delta = "green" if delta_csat >= 0 else "red"
@@ -1862,7 +1590,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
             <p style="font-size: 14px; color: {cor_delta}; margin: 0;">{delta_csat:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
-    
     with col2:
         diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
         cor_diff = "green" if diff_avaliacoes >= 0 else "red"
@@ -1874,7 +1601,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
             <p style="font-size: 14px; color: {cor_diff}; margin: 0;">{diff_avaliacoes:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
-    
     with col3:
         st.markdown(f"""
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #17a2b8;">
@@ -1883,7 +1609,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
             <p style="font-size: 12px; color: #666; margin: 0;">Clientes não avaliaram</p>
         </div>
         """, unsafe_allow_html=True)
-    
     with col4:
         diff_atend = dados['total_atendimentos'] - media_operacao
         cor_atend = "green" if diff_atend >= 0 else "red"
@@ -1895,16 +1620,15 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
             <p style="font-size: 14px; color: {cor_atend}; margin: 0;">{diff_atend:+.0f}</p>
         </div>
         """, unsafe_allow_html=True)
-    
     with col5:
         if posicao_podio:
             medalha = ["🥇", "🥈", "🥉"][posicao_podio-1]
-            cor_podio = ['#FFD700', '#C0C0C0', '#CD7F32'][posicao_podio-1]
+            cores = ['#FFD700', '#C0C0C0', '#CD7F32']
             st.markdown(f"""
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {cor_podio};">
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {cores[posicao_podio-1]};">
                 <p style="font-size: 12px; color: #666; margin: 0;">🏆 Ranking</p>
                 <p style="font-size: 40px; margin: 0;">{medalha}</p>
-                <p style="font-size: 16px; font-weight: bold; margin: 5px 0; color: {cor_podio};">{posicao_podio}º Lugar</p>
+                <p style="font-size: 16px; font-weight: bold; margin: 5px 0; color: {cores[posicao_podio-1]};">{posicao_podio}º Lugar</p>
                 <p style="font-size: 12px; color: #666; margin: 0;">Pódio do Mês</p>
             </div>
             """, unsafe_allow_html=True)
@@ -1919,35 +1643,12 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
             """, unsafe_allow_html=True)
     
     st.markdown("---")
-    
     col1, col2 = st.columns(2)
-    
     with col1:
         fig_barras = go.Figure()
-        fig_barras.add_trace(go.Bar(
-            x=['CSAT'],
-            y=[dados['csat']],
-            name='Alcançado',
-            marker_color='#2ecc71',
-            text=[f"{dados['csat']:.1f}%"],
-            textposition='outside'
-        ))
-        fig_barras.add_trace(go.Bar(
-            x=['CSAT'],
-            y=[dados['meta_csat']],
-            name='Meta',
-            marker_color='#e74c3c',
-            text=[f"{dados['meta_csat']}%"],
-            textposition='outside'
-        ))
-        fig_barras.update_layout(
-            title='CSAT - Resultado vs Meta',
-            yaxis_title='Percentual (%)',
-            yaxis_range=[0, 100],
-            height=350,
-            showlegend=True,
-            legend=dict(orientation='h', yanchor='bottom', y=1.02)
-        )
+        fig_barras.add_trace(go.Bar(x=['CSAT'], y=[dados['csat']], name='Alcançado', marker_color='#2ecc71', text=[f"{dados['csat']:.1f}%"], textposition='outside'))
+        fig_barras.add_trace(go.Bar(x=['CSAT'], y=[dados['meta_csat']], name='Meta', marker_color='#e74c3c', text=[f"{dados['meta_csat']}%"], textposition='outside'))
+        fig_barras.update_layout(title='CSAT - Resultado vs Meta', yaxis_title='Percentual (%)', yaxis_range=[0, 100], height=350, showlegend=True, legend=dict(orientation='h', yanchor='bottom', y=1.02))
         st.plotly_chart(fig_barras, use_container_width=True)
         
         fig_gauge = go.Figure(go.Indicator(
@@ -1962,51 +1663,24 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
                     {'range': [0, dados['meta_csat']], 'color': "rgba(231, 76, 60, 0.3)"},
                     {'range': [dados['meta_csat'], 100], 'color': "rgba(46, 204, 113, 0.3)"}
                 ],
-                'threshold': {
-                    'line': {'color': "red", 'width': 4},
-                    'thickness': 0.75,
-                    'value': dados['meta_csat']
-                }
+                'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': dados['meta_csat']}
             }
         ))
         fig_gauge.update_layout(height=250)
         st.plotly_chart(fig_gauge, use_container_width=True)
-    
     with col2:
         categorias = ['CSAT', '% Avaliações', '% Envio', 'Atendimentos']
         csat_norm = dados['csat']
         avaliacoes_norm = dados['perc_avaliacoes']
         envio_norm = dados['perc_envio']
         atend_norm = min(100, (dados['total_atendimentos'] / media_operacao) * 100) if media_operacao > 0 else 0
-        
         valores_analista = [csat_norm, avaliacoes_norm, envio_norm, atend_norm]
         valores_meta = [dados['meta_csat'], dados['meta_geral'], 50, 100]
         
         fig_radar = go.Figure()
-        fig_radar.add_trace(go.Scatterpolar(
-            r=valores_analista,
-            theta=categorias,
-            fill='toself',
-            name=analista,
-            line_color='#2ecc71',
-            fillcolor='rgba(46, 204, 113, 0.3)'
-        ))
-        fig_radar.add_trace(go.Scatterpolar(
-            r=valores_meta,
-            theta=categorias,
-            fill='toself',
-            name='Meta',
-            line_color='#e74c3c',
-            fillcolor='rgba(231, 76, 60, 0.1)',
-            line_dash='dash'
-        ))
-        fig_radar.update_layout(
-            title='Radar de Performance',
-            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-            height=400,
-            showlegend=True,
-            legend=dict(orientation='h', yanchor='bottom', y=1.02)
-        )
+        fig_radar.add_trace(go.Scatterpolar(r=valores_analista, theta=categorias, fill='toself', name=analista, line_color='#2ecc71', fillcolor='rgba(46, 204, 113, 0.3)'))
+        fig_radar.add_trace(go.Scatterpolar(r=valores_meta, theta=categorias, fill='toself', name='Meta', line_color='#e74c3c', fillcolor='rgba(231, 76, 60, 0.1)', line_dash='dash'))
+        fig_radar.update_layout(title='Radar de Performance', polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=400, showlegend=True, legend=dict(orientation='h', yanchor='bottom', y=1.02))
         st.plotly_chart(fig_radar, use_container_width=True)
     
     st.markdown("---")
@@ -2017,8 +1691,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
 # ============================================
 
 def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, supabase, gestor_ativo, acesso_total):
-    """Gera o relatório individual completo"""
-    
     posicao_podio = criar_painel_analista(analista, dados, media_operacao, podio)
     
     if supabase:
@@ -2039,25 +1711,13 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
     with st.expander("📝 Feedback de Performance", expanded=True):
         st.subheader(f"📝 Feedback - {analista}")
         feedback_atual = gerar_feedback_manual(analista, dados, media_operacao, posicao_podio)
-        
-        feedback_editado = st.text_area(
-            "✏️ Edite o feedback abaixo. Após editar, clique em 'Gerar com IA' para melhorar:",
-            value=feedback_atual,
-            height=400,
-            key="feedback_editor"
-        )
+        feedback_editado = st.text_area("✏️ Edite o feedback abaixo. Após editar, clique em 'Gerar com IA' para melhorar:", value=feedback_atual, height=400, key="feedback_editor")
         
         col1, col2 = st.columns([1, 3])
         with col1:
             if st.button("🤖 Gerar com IA", use_container_width=True):
                 with st.spinner("Gerando feedback com IA..."):
-                    feedback_gerado = gerar_feedback_ia(
-                        analista,
-                        dados,
-                        media_operacao,
-                        posicao_podio,
-                        feedback_editado
-                    )
+                    feedback_gerado = gerar_feedback_ia(analista, dados, media_operacao, posicao_podio, feedback_editado)
                     if feedback_gerado:
                         st.session_state.feedback_gerado = feedback_gerado
                         st.success("✅ Feedback gerado com IA!")
@@ -2071,13 +1731,7 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
                 st.session_state.feedback_final = st.session_state.feedback_gerado
                 st.success("✅ Feedback selecionado!")
         
-        if st.session_state.get('feedback_final'):
-            st.markdown("---")
-            st.subheader("📋 Feedback Final")
-            st.markdown(st.session_state.feedback_final)
-            feedback = st.session_state.feedback_final
-        else:
-            feedback = feedback_editado
+        feedback = st.session_state.get('feedback_final', feedback_editado)
     
     with st.expander("📄 Relatório Completo", expanded=False):
         relatorio_markdown = f"""
@@ -2114,19 +1768,9 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
     
     col1, col2 = st.columns(2)
     with col1:
-        st.download_button(
-            label="📥 Baixar Análise (Word)",
-            data=gerar_relatorio_word(analista, dados, analise_tecnica, "", media_operacao, podio, periodo),
-            file_name=f"Analise_{analista.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        st.download_button(label="📥 Baixar Análise (Word)", data=gerar_relatorio_word(analista, dados, analise_tecnica, "", media_operacao, podio, periodo), file_name=f"Analise_{analista.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     with col2:
-        st.download_button(
-            label="📥 Baixar Relatório Completo (Word)",
-            data=gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_operacao, podio, periodo),
-            file_name=f"Relatorio_Completo_{analista.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        st.download_button(label="📥 Baixar Relatório Completo (Word)", data=gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_operacao, podio, periodo), file_name=f"Relatorio_Completo_{analista.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 # ============================================
 # INTERFACE PRINCIPAL
@@ -2136,35 +1780,28 @@ def main():
     st.title("📊 Sistema de Performance - Relatórios Automáticos")
     st.markdown("---")
     
-    # ===== LOGIN =====
     if not fazer_login():
         st.info("👋 Faça login na barra lateral para acessar o sistema.")
         return
     
-    # ===== CADASTRO DE USUÁRIO =====
     if st.session_state.get('cadastrar_usuario', False):
         cadastrar_usuario()
         return
     
-    # ===== LIMPAR ESTADO DA SESSÃO =====
     limpar_estado_sessao()
-    
-    # ===== INICIALIZAR SUPABASE =====
     supabase = init_supabase()
+    
     if supabase:
         st.sidebar.success("✅ Conectado ao Supabase")
     else:
         st.sidebar.warning("⚠️ Supabase não configurado")
     
-    # ===== CARREGAR DADOS =====
     analistas_config = carregar_analistas()
-    
-    # ===== OBTER PERFIL E GESTOR ATIVO =====
     acesso_total = st.session_state.get('acesso_total', False)
     gestor_ativo = st.session_state.get('gestor', None)
     nome_usuario = st.session_state.get('nome_usuario', '')
     
-    # ===== SIDEBAR =====
+    # SIDEBAR
     with st.sidebar:
         st.header("📁 Upload de Arquivos")
         arquivo_satisfacao = st.file_uploader("Arquivo de Satisfação", type=['xlsx', 'csv'])
@@ -2205,7 +1842,6 @@ def main():
                             periodo = periodo_manual
                         
                         st.session_state.periodo = periodo
-                        
                         gestor_salvar = st.session_state.get('gestor', GESTOR_MARCOS)
                         
                         if supabase:
@@ -2261,7 +1897,15 @@ def main():
     
     # ===== GERENCIAR ANALISTAS =====
     if st.session_state.get('gerenciar_analistas', False):
-        gerenciar_analistas_completo(analistas_config)
+        # Função de gerenciamento simplificada
+        st.header("📝 Gerenciar Analistas")
+        gestor_selecionado = st.selectbox("Selecione o Gestor", list(analistas_config.keys()))
+        if gestor_selecionado:
+            config = analistas_config[gestor_selecionado]
+            st.write(f"**{gestor_selecionado}** - {len(config['membros'])} analistas:")
+            for analista, dados in config['membros'].items():
+                st.write(f"- {analista} (Meta: {dados['meta_csat']}%, Ativo: {dados['ativo']})")
+        
         if st.button("🔙 Voltar", key="voltar_gerenciar_analistas"):
             st.session_state.gerenciar_analistas = False
             st.rerun()
@@ -2281,42 +1925,10 @@ def main():
                 for p in periodos:
                     df_periodo = carregar_historico(supabase, mes_ano=p['mes_ano'], gestor=p['gestor'])
                     qtd_analistas = len(df_periodo) if df_periodo is not None else 0
-                    dados_tabela.append({
-                        'Período': p['mes_ano'],
-                        'Gestor': p['gestor'],
-                        'Analistas': qtd_analistas,
-                        'Data Importação': p.get('data_criacao', 'N/A')[:10] if p.get('data_criacao') else 'N/A'
-                    })
-                df_periodos = pd.DataFrame(dados_tabela)
-                st.dataframe(df_periodos, use_container_width=True, hide_index=True)
-                st.markdown("---")
-                
-                st.subheader("🗑️ Excluir Período")
-                col1, col2 = st.columns([2, 1])
-                with col1:
-                    periodo_para_excluir = st.selectbox("Selecione o período", [p['mes_ano'] for p in periodos])
-                with col2:
-                    confirmar = st.checkbox("✅ Confirmar exclusão")
-                
-                if st.button("🗑️ Excluir Período", use_container_width=True):
-                    if not confirmar:
-                        st.error("⚠️ Marque a caixa de confirmação.")
-                    else:
-                        gestor_periodo = next((p['gestor'] for p in periodos if p['mes_ano'] == periodo_para_excluir), None)
-                        if gestor_periodo:
-                            if not acesso_total and gestor_periodo != gestor_ativo:
-                                st.error("❌ Sem permissão para excluir.")
-                            else:
-                                sucesso, mensagem = excluir_periodo(supabase, periodo_para_excluir, gestor_periodo)
-                                if sucesso:
-                                    st.success(f"✅ {mensagem}")
-                                else:
-                                    st.error(f"❌ Erro: {mensagem}")
+                    dados_tabela.append({'Período': p['mes_ano'], 'Gestor': p['gestor'], 'Analistas': qtd_analistas})
+                st.dataframe(pd.DataFrame(dados_tabela), use_container_width=True, hide_index=True)
             else:
-                if acesso_total:
-                    st.info("Nenhum período importado na operação.")
-                else:
-                    st.info(f"Nenhum período importado para {gestor_ativo}.")
+                st.info("Nenhum período encontrado.")
         else:
             st.error("❌ Supabase não configurado.")
         
@@ -2328,7 +1940,6 @@ def main():
     # ===== CONSULTAR HISTÓRICO =====
     if st.session_state.get('mostrar_historico', False):
         st.header("📊 Consultar Histórico")
-        
         if supabase:
             if acesso_total:
                 df_historico = carregar_historico(supabase)
@@ -2336,86 +1947,9 @@ def main():
                 df_historico = carregar_historico(supabase, gestor=gestor_ativo)
             
             if df_historico is not None and not df_historico.empty:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    meses_disponiveis = ['Todos'] + sorted(df_historico['mes_ano'].unique().tolist())
-                    mes_selecionado = st.selectbox("Selecione o Mês", meses_disponiveis)
-                with col2:
-                    if acesso_total:
-                        gestores_disponiveis = ['Todos'] + sorted(df_historico['gestor'].unique().tolist())
-                    else:
-                        gestores_disponiveis = [gestor_ativo]
-                    gestor_filtro = st.selectbox("Selecione o Gestor", gestores_disponiveis)
-                with col3:
-                    if acesso_total and gestor_filtro != 'Todos':
-                        df_analistas = df_historico[df_historico['gestor'] == gestor_filtro]
-                    elif not acesso_total:
-                        df_analistas = df_historico[df_historico['gestor'] == gestor_ativo]
-                    else:
-                        df_analistas = df_historico
-                    analistas_disponiveis = ['Todos'] + sorted(df_analistas['analista'].unique().tolist())
-                    analista_filtro = st.selectbox("Selecione o Analista", analistas_disponiveis)
-                
-                df_filtrado = df_historico.copy()
-                if mes_selecionado != 'Todos':
-                    df_filtrado = df_filtrado[df_filtrado['mes_ano'] == mes_selecionado]
-                if gestor_filtro != 'Todos' and acesso_total:
-                    df_filtrado = df_filtrado[df_filtrado['gestor'] == gestor_filtro]
-                elif not acesso_total:
-                    df_filtrado = df_filtrado[df_filtrado['gestor'] == gestor_ativo]
-                if analista_filtro != 'Todos':
-                    df_filtrado = df_filtrado[df_filtrado['analista'] == analista_filtro]
-                
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Total Registros", len(df_filtrado))
-                with col2:
-                    st.metric("CSAT Médio", f"{df_filtrado['csat'].mean():.2f}%")
-                with col3:
-                    st.metric("% Avaliações Médio", f"{df_filtrado['perc_avaliacoes'].mean():.2f}%")
-                with col4:
-                    st.metric("% Envio Médio", f"{df_filtrado['perc_envio'].mean():.2f}%")
-                
-                st.markdown("---")
-                
-                if not df_filtrado.empty:
-                    df_agrupado = df_filtrado.groupby('mes_ano').agg({
-                        'csat': 'mean',
-                        'perc_avaliacoes': 'mean',
-                        'perc_envio': 'mean'
-                    }).reset_index()
-                    
-                    meses_ordenados = ordenar_meses(df_agrupado['mes_ano'].unique().tolist())
-                    df_agrupado['ordem'] = df_agrupado['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
-                    df_agrupado = df_agrupado.sort_values('ordem')
-                    
-                    fig_historico = px.line(
-                        df_agrupado,
-                        x='mes_ano',
-                        y=['csat', 'perc_avaliacoes', 'perc_envio'],
-                        title='📈 Evolução Mensal',
-                        labels={'value': 'Percentual (%)', 'mes_ano': 'Mês/Ano', 'variable': 'Métrica'}
-                    )
-                    fig_historico.update_layout(height=400)
-                    st.plotly_chart(fig_historico, use_container_width=True)
-                    
-                    if analista_filtro != 'Todos':
-                        st.subheader(f"📊 Evolução Mensal - {analista_filtro}")
-                        df_analista = df_filtrado[df_filtrado['analista'] == analista_filtro]
-                        if not df_analista.empty:
-                            meta_csat = df_analista['meta_csat'].iloc[0] if 'meta_csat' in df_analista.columns else 90
-                            meta_geral = df_analista['meta_geral'].iloc[0] if 'meta_geral' in df_analista.columns else 25
-                            fig_mensal = gerar_grafico_mensal(analista_filtro, df_historico, meta_csat, meta_geral)
-                            if fig_mensal:
-                                st.plotly_chart(fig_mensal, use_container_width=True)
-                
-                st.subheader("📋 Dados Históricos")
-                st.dataframe(df_filtrado, use_container_width=True)
+                st.dataframe(df_historico, use_container_width=True)
             else:
-                if acesso_total:
-                    st.warning("Nenhum dado histórico encontrado na operação.")
-                else:
-                    st.warning(f"Nenhum dado histórico encontrado para {gestor_ativo}.")
+                st.warning("Nenhum dado histórico encontrado.")
         else:
             st.error("❌ Supabase não configurado.")
         
@@ -2425,15 +1959,13 @@ def main():
         st.markdown("---")
     
     # ============================================
-    # DASHBOARD PRINCIPAL - CORRIGIDO
+    # DASHBOARD PRINCIPAL
     # ============================================
     
-    # Verifica se há dados processados
     if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
         
         periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
         
-        # ===== SELETOR DE PERÍODO NA DASHBOARD =====
         if supabase:
             if acesso_total:
                 periodos_disponiveis = listar_periodos(supabase)
@@ -2442,36 +1974,23 @@ def main():
             
             if periodos_disponiveis:
                 periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
-                periodo_selecionado = st.selectbox(
-                    "📅 Selecione o Período para visualizar",
-                    periodos_lista,
-                    index=0 if periodo in periodos_lista else 0,
-                    key="seletor_periodo_dashboard"
-                )
+                periodo_selecionado = st.selectbox("📅 Selecione o Período para visualizar", periodos_lista, index=0 if periodo in periodos_lista else 0, key="seletor_periodo_dashboard")
                 if periodo_selecionado != periodo:
                     st.session_state.periodo = periodo_selecionado
                     st.rerun()
         
-        # ===== CARREGAR DADOS COM FILTRO DE GESTOR =====
         if acesso_total:
-            # COORDENADOR - Visualiza todos os dados
             df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
             st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
-            
             if df_historico is not None and not df_historico.empty:
                 dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
             else:
                 st.warning(f"⚠️ Nenhum dado encontrado para o período {st.session_state.periodo}")
-        
         else:
-            # GESTOR - Visualiza apenas sua equipe
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
-            
-            # Carregar dados APENAS do gestor atual
             df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo, gestor=gestor_ativo)
             
             if df_historico is not None and not df_historico.empty:
-                # Converter para dicionário
                 resultados = {}
                 for _, row in df_historico.iterrows():
                     resultados[row['analista']] = {
@@ -2491,15 +2010,10 @@ def main():
                         'gestor': row['gestor']
                     }
                 
-                # Atualizar session_state
                 st.session_state.resultados = resultados
-                
-                # Exibir dashboard do gestor
                 dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
             else:
                 st.warning(f"⚠️ Nenhum dado encontrado para {gestor_ativo} no período {st.session_state.periodo}")
-                
-                # Tentar carregar o último período disponível para o gestor
                 periodos_gestor = listar_periodos(supabase, gestor_ativo)
                 if periodos_gestor:
                     periodos_ordenados = sorted(periodos_gestor, key=lambda x: x['mes_ano'], reverse=True)
@@ -2508,7 +2022,7 @@ def main():
                     st.session_state.periodo = ultimo_periodo['mes_ano']
                     st.rerun()
             
-            # ===== EXIBIR DASHBOARD POR PERFIL =====
+            # EXIBIR DASHBOARD POR PERFIL
             if acesso_total:
                 st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
                 dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
@@ -2518,8 +2032,6 @@ def main():
                 
                 if resultados:
                     st.markdown("---")
-                    
-                    # ===== PÓDIO =====
                     st.subheader("🏆 Pódio do Mês")
                     
                     media_atendimentos = calcular_media_operacao(resultados)
@@ -2532,52 +2044,6 @@ def main():
                                 podio = podio_manual
                         except:
                             pass
-                    
-                    with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
-                        st.info("Ajuste manualmente os resultados do pódio se necessário.")
-                        podio_manual = []
-                        for i in range(3):
-                            col1, col2, col3 = st.columns([2, 1, 1])
-                            with col1:
-                                nome = podio[i][0] if i < len(podio) else ""
-                                nome_edit = st.text_input(f"{i+1}º - Nome", value=nome, key=f"podio_nome_{i}")
-                            with col2:
-                                csat = podio[i][1] if i < len(podio) else 0
-                                csat_edit = st.number_input(f"CSAT (%)", value=float(csat), key=f"podio_csat_{i}")
-                            with col3:
-                                atend = podio[i][2] if i < len(podio) else 0
-                                atend_edit = st.number_input(f"💬 Atendimentos", value=int(atend), key=f"podio_atend_{i}")
-                            if nome_edit:
-                                podio_manual.append((nome_edit, csat_edit, atend_edit, 0))
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if podio_manual and st.button("💾 Salvar Pódio Manual"):
-                                if supabase and not acesso_total:
-                                    try:
-                                        sucesso, mensagem = salvar_podio_manual(supabase, st.session_state.periodo, gestor_ativo, podio_manual)
-                                        if sucesso:
-                                            podio = podio_manual
-                                            st.success("✅ Pódio salvo!")
-                                            st.rerun()
-                                        else:
-                                            st.error(f"Erro: {mensagem}")
-                                    except Exception as e:
-                                        st.error(f"Erro: {str(e)}")
-                                else:
-                                    st.error("❌ Supabase não configurado.")
-                        
-                        with col2:
-                            if st.button("🔄 Resetar Pódio"):
-                                if supabase and not acesso_total:
-                                    try:
-                                        supabase.table('podio_manual').delete().eq('mes_ano', st.session_state.periodo).eq('gestor', gestor_ativo).execute()
-                                        st.success("✅ Pódio resetado!")
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Erro: {str(e)}")
-                                else:
-                                    st.error("❌ Supabase não configurado.")
                     
                     if podio:
                         col1, col2, col3 = st.columns(3)
@@ -2600,21 +2066,14 @@ def main():
                         st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
                     
                     st.markdown("---")
-                    
-                    # ===== RELATÓRIO INDIVIDUAL =====
                     st.subheader("📄 Gerar Relatório Individual")
-                    
                     analista_selecionado = st.selectbox("Selecione o Analista", list(resultados.keys()))
-                    
                     if analista_selecionado:
                         dados = resultados[analista_selecionado]
                         gerar_relatorio_individual(analista_selecionado, dados, media_atendimentos, podio, st.session_state.periodo, supabase, gestor_ativo, acesso_total)
     
-    # ===== SE NÃO HOUVER DADOS PROCESSADOS =====
     else:
-        # Verifica se estamos em outras páginas (gerenciar_analistas, mostrar_historico, mostrar_periodos)
         if not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
-            
             if acesso_total:
                 st.info("📊 Bem-vindo, Coordenador! Faça upload dos arquivos ou consulte o histórico.")
             else:
@@ -2655,16 +2114,9 @@ def main():
                         st.session_state.processado = True
                         st.session_state.periodo = ultimo_periodo['mes_ano']
                         st.rerun()
-
+    
     st.markdown("---")
-    st.markdown(
-        """
-        <div style="text-align: center; color: #666; font-size: 12px;">
-            Sistema de Performance v11.0 | UX Melhorado + Dashboard Visual + Evolução de Indicadores
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div style="text-align: center; color: #666; font-size: 12px;">Sistema de Performance v11.0 | UX Melhorado + Dashboard Visual + Evolução de Indicadores</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
