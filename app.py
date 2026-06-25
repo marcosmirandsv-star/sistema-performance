@@ -376,7 +376,6 @@ def excluir_periodo(supabase, mes_ano, gestor):
         supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         
-        # Limpar session_state se o período excluído for o atual
         if 'resultados' in st.session_state:
             if st.session_state.get('periodo') == mes_ano:
                 st.session_state.resultados = {}
@@ -508,6 +507,7 @@ def carregar_analistas():
                 "Ana Claudia Corrêa": {"meta_csat": 90, "ativo": True},
                 "João Vitor Almeida": {"meta_csat": 90, "ativo": True},
                 "João Pedro Vianey": {"meta_csat": 90, "ativo": True},
+                "Carlos Lemos": {"meta_csat": 90, "ativo": True},
                 "Lorena Almeida": {"meta_csat": 86, "ativo": True},
                 "Paulo Victor": {"meta_csat": 86, "ativo": True},
                 "Rayane Nunes": {"meta_csat": 86, "ativo": True},
@@ -713,7 +713,6 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
         valores_unicos = df_satisfacao['Índice de satisfação do ticket'].unique().tolist()
         st.write(f"**Valores encontrados na coluna de satisfação:** {valores_unicos}")
         
-        # Verificar se os valores estão em português
         valores_portugues = ['Boa', 'Ruim', 'Oferecida', 'Não oferecida', 'boa', 'ruim', 'oferecida', 'não oferecida']
         if any(v in valores_portugues for v in valores_unicos):
             st.warning("⚠️ A coluna de satisfação está em português (Boa/Ruim). O sistema espera 'Good'/'Bad'.")
@@ -837,7 +836,15 @@ def calcular_media_operacao(resultados, gestor=None):
     return round(total_atendimentos / total_analistas) if total_analistas > 0 else 0
 
 def calcular_podio(resultados, gestor=None, media_atendimentos=None, limiar_csat=90):
-    """Calcula o pódio baseado em CSAT ≥ 90% e Atendimentos ≥ média"""
+    """
+    Calcula o pódio baseado em:
+    - CSAT ≥ 90%
+    - Atendimentos ≥ média
+    - % Avaliações ≥ 25%
+    
+    O pódio só existe se TODOS os critérios forem atingidos.
+    Se ninguém atingir 25% de avaliações, o pódio fica vazio.
+    """
     if gestor:
         dados_filtrados = {k: v for k, v in resultados.items() 
                           if v['gestor'] == gestor and v['avaliacoes'] > 0}
@@ -847,9 +854,20 @@ def calcular_podio(resultados, gestor=None, media_atendimentos=None, limiar_csat
     if media_atendimentos is None:
         media_atendimentos = calcular_media_operacao(resultados, gestor)
     
+    # Aplicar TODOS os critérios
     dados_validos = {k: v for k, v in dados_filtrados.items() 
-                     if v['csat'] >= limiar_csat and v['total_atendimentos'] >= media_atendimentos}
+                     if v['csat'] >= limiar_csat 
+                     and v['total_atendimentos'] >= media_atendimentos 
+                     and v['perc_avaliacoes'] >= 25}
     
+    if not dados_validos:
+        st.info("🏆 Nenhum analista atingiu todos os critérios do pódio:")
+        st.info("   - CSAT ≥ 90%")
+        st.info("   - Atendimentos ≥ Média da Operação")
+        st.info("   - % Avaliações ≥ 25%")
+        return []
+    
+    # Ordenar por CSAT (decrescente)
     sorted_analistas = sorted(dados_validos.items(), key=lambda x: x[1]['csat'], reverse=True)
     top_3 = sorted_analistas[:3]
     
@@ -2259,7 +2277,7 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info("Nenhum analista atingiu os critérios do pódio (CSAT ≥ 90% e 💬 Atendimentos ≥ Média)")
+            st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
         
         st.markdown("---")
         
