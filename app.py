@@ -675,7 +675,71 @@ def extrair_periodo(df_satisfacao):
     return datetime.now().strftime('%B %Y')
 
 def processar_dados(df_satisfacao, df_inativos, analistas_config):
+  def processar_dados(df_satisfacao, df_inativos, analistas_config):
     """Processa os dados e calcula todas as métricas"""
+    
+    # ===== DIAGNÓSTICO =====
+    st.subheader("🔍 Diagnóstico do Processamento")
+    
+    colunas_sat = df_satisfacao.columns.tolist()
+    colunas_inat = df_inativos.columns.tolist()
+    
+    st.write("**Colunas do arquivo de satisfação:**")
+    st.write(colunas_sat)
+    st.write("**Colunas do arquivo de inativos:**")
+    st.write(colunas_inat)
+    
+    # Verificar valores da coluna de satisfação
+    if 'Índice de satisfação do ticket' in df_satisfacao.columns:
+        valores_unicos = df_satisfacao['Índice de satisfação do ticket'].unique().tolist()
+        st.write(f"**Valores encontrados na coluna de satisfação:** {valores_unicos}")
+        
+        # Verificar se os valores estão em português
+        valores_portugues = ['Boa', 'Ruim', 'Oferecida', 'Não oferecida', 'boa', 'ruim', 'oferecida', 'não oferecida']
+        if any(v in valores_portugues for v in valores_unicos):
+            st.warning("⚠️ A coluna de satisfação está em português (Boa/Ruim). O sistema espera 'Good'/'Bad'.")
+            st.info("🔄 Convertendo automaticamente...")
+            
+            # Mapeamento de conversão
+            mapa_conversao = {
+                'Boa': 'Good',
+                'boa': 'Good',
+                'Ruim': 'Bad',
+                'ruim': 'Bad',
+                'Oferecida': 'Offered',
+                'oferecida': 'Offered',
+                'Não oferecida': 'Unoffered',
+                'não oferecida': 'Unoffered',
+                'Nao oferecida': 'Unoffered',
+                'nao oferecida': 'Unoffered'
+            }
+            
+            df_satisfacao['Índice de satisfação do ticket'] = df_satisfacao['Índice de satisfação do ticket'].replace(mapa_conversao)
+            
+            # Mostrar valores após conversão
+            valores_convertidos = df_satisfacao['Índice de satisfação do ticket'].unique().tolist()
+            st.success(f"✅ Conversão realizada! Novos valores: {valores_convertidos}")
+    
+    # Verificar nomes dos analistas
+    analistas_arquivo = df_satisfacao['Nome do atribuído'].unique().tolist()
+    analistas_config_list = []
+    for gestor, config in analistas_config.items():
+        for analista in config['membros'].keys():
+            analistas_config_list.append(analista)
+    
+    st.write(f"**Analistas no arquivo:** {len(analistas_arquivo)}")
+    st.write(f"**Analistas configurados:** {len(analistas_config_list)}")
+    
+    analistas_faltando = set(analistas_arquivo) - set(analistas_config_list)
+    if analistas_faltando:
+        st.warning(f"⚠️ Analistas no arquivo mas NÃO configurados: {list(analistas_faltando)}")
+        st.info("💡 Adicione esses analistas na configuração para processá-los.")
+    
+    st.write(f"**Total de registros no arquivo de satisfação:** {len(df_satisfacao)}")
+    st.write(f"**Total de registros no arquivo de inativos:** {len(df_inativos)}")
+    st.markdown("---")
+    # ===== FIM DO DIAGNÓSTICO =====
+    
     resultados = {}
     
     analistas_ativos = []
@@ -695,9 +759,20 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
         total_inativos = len(inativos_analista)
         validos = total_atendimentos - total_inativos
         
+        # Verificar se há avaliações
         avaliacoes = len(tickets_analista[tickets_analista['Índice de satisfação do ticket'].isin(['Good', 'Bad'])])
         positivos = len(tickets_analista[tickets_analista['Índice de satisfação do ticket'] == 'Good'])
         negativos = len(tickets_analista[tickets_analista['Índice de satisfação do ticket'] == 'Bad'])
+        
+        # ===== DIAGNÓSTICO INDIVIDUAL =====
+        if analista == list(resultados_gestor.keys())[0] if resultados_gestor else False:
+            st.write(f"**Diagnóstico para {analista}:**")
+            st.write(f"- Total atendimentos: {total_atendimentos}")
+            st.write(f"- Inativos: {total_inativos}")
+            st.write(f"- Válidos: {validos}")
+            st.write(f"- Avaliações: {avaliacoes} (Good: {positivos}, Bad: {negativos})")
+            st.write(f"- Valores na coluna de satisfação: {tickets_analista['Índice de satisfação do ticket'].unique().tolist()}")
+        # ===== FIM DIAGNÓSTICO =====
         
         perc_avaliacoes = (avaliacoes / validos * 100) if validos > 0 else 0
         csat = (positivos / avaliacoes * 100) if avaliacoes > 0 else 0
@@ -743,7 +818,6 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
         }
     
     return resultados
-
 def calcular_media_operacao(resultados, gestor=None):
     """Calcula a média de atendimentos por agente"""
     if gestor:
