@@ -50,11 +50,8 @@ def normalizar_nome_coluna(nome):
     Remove espaços extras, caracteres especiais e converte para minúsculo
     """
     import re
-    # Converter para minúsculo
     nome = nome.lower().strip()
-    # Remover caracteres especiais e espaços extras
     nome = re.sub(r'[^a-záéíóúãõç0-9\s]', '', nome)
-    # Remover espaços múltiplos
     nome = re.sub(r'\s+', ' ', nome).strip()
     return nome
 
@@ -92,7 +89,6 @@ def carregar_arquivo_satisfacao(arquivo):
     colunas = df.columns.tolist()
     st.info(f"🔍 Colunas encontradas no arquivo de satisfação: {', '.join(colunas)}")
     
-    # Identificar cada coluna
     col_id = identificar_coluna_flexivel(df, [
         'ID do ticket', 'Ticket ID', 'ID', 'ticket_id', 'id_ticket'
     ])
@@ -108,7 +104,6 @@ def carregar_arquivo_satisfacao(arquivo):
         'assignee_name', 'nome_atribuido', 'nome do atribuído'
     ])
     
-    # Verificar se encontrou todas
     if not col_id:
         st.error("❌ Coluna 'ID do ticket' não encontrada no arquivo de satisfação.")
         st.info(f"Colunas disponíveis: {', '.join(colunas)}")
@@ -124,16 +119,30 @@ def carregar_arquivo_satisfacao(arquivo):
         st.info(f"Colunas disponíveis: {', '.join(colunas)}")
         return None
     
-    # Renomear colunas para o padrão esperado
     df_renomeado = df.rename(columns={
         col_id: 'ID do ticket',
         col_satisfacao: 'Índice de satisfação do ticket',
         col_atribuido: 'Nome do atribuído'
     })
     
-    # Manter apenas as colunas necessárias
     colunas_necessarias = ['ID do ticket', 'Índice de satisfação do ticket', 'Nome do atribuído']
     df_final = df_renomeado[colunas_necessarias].copy()
+    
+    # Converter valores de satisfação para o padrão esperado
+    if 'Índice de satisfação do ticket' in df_final.columns:
+        mapa_conversao = {
+            'Boa': 'Good',
+            'boa': 'Good',
+            'Ruim': 'Bad',
+            'ruim': 'Bad',
+            'Oferecida': 'Offered',
+            'oferecida': 'Offered',
+            'Não oferecida': 'Unoffered',
+            'não oferecida': 'Unoffered',
+            'Nao oferecida': 'Unoffered',
+            'nao oferecida': 'Unoffered'
+        }
+        df_final['Índice de satisfação do ticket'] = df_final['Índice de satisfação do ticket'].replace(mapa_conversao)
     
     st.success(f"✅ Arquivo de satisfação carregado! {len(df_final)} registros encontrados.")
     
@@ -162,7 +171,6 @@ def carregar_arquivo_inativos(arquivo):
     colunas = df.columns.tolist()
     st.info(f"🔍 Colunas encontradas no arquivo de inativos: {', '.join(colunas)}")
     
-    # Identificar cada coluna
     col_id = identificar_coluna_flexivel(df, [
         'ID do ticket', 'Ticket ID', 'ID', 'ticket_id', 'id_ticket'
     ])
@@ -172,7 +180,6 @@ def carregar_arquivo_inativos(arquivo):
         'assignee_name', 'nome_atribuido', 'nome do atribuído'
     ])
     
-    # Verificar se encontrou todas
     if not col_id:
         st.error("❌ Coluna 'ID do ticket' não encontrada no arquivo de inativos.")
         st.info(f"Colunas disponíveis: {', '.join(colunas)}")
@@ -183,13 +190,11 @@ def carregar_arquivo_inativos(arquivo):
         st.info(f"Colunas disponíveis: {', '.join(colunas)}")
         return None
     
-    # Renomear colunas para o padrão esperado
     df_renomeado = df.rename(columns={
         col_id: 'ID do ticket',
         col_atribuido: 'Nome do atribuído'
     })
     
-    # Manter apenas as colunas necessárias
     colunas_necessarias = ['ID do ticket', 'Nome do atribuído']
     df_final = df_renomeado[colunas_necessarias].copy()
     
@@ -201,7 +206,7 @@ def carregar_arquivo_inativos(arquivo):
     return df_final
 
 # ============================================
-# FUNÇÕES EXISTENTES (mantidas)
+# FUNÇÕES DE BANCO DE DADOS
 # ============================================
 
 def salvar_historico(supabase, dados, mes_ano, gestor):
@@ -231,7 +236,6 @@ def salvar_historico(supabase, dados, mes_ano, gestor):
                 'status': d['status']
             })
         
-        # Verificar se já existe registro para o período
         existing = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         
         if existing.data:
@@ -250,10 +254,8 @@ def substituir_historico(supabase, dados, mes_ano, gestor):
         return False, "Supabase não configurado"
     
     try:
-        # Deletar registros existentes
         supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         
-        # Inserir novos registros
         registros = []
         for analista, d in dados.items():
             registros.append({
@@ -366,13 +368,21 @@ def listar_periodos(supabase, gestor=None):
         return []
 
 def excluir_periodo(supabase, mes_ano, gestor):
-    """Exclui todos os registros de um período"""
+    """Exclui todos os registros de um período e limpa o estado da sessão"""
     if not supabase:
         return False, "Supabase não configurado"
     
     try:
         supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        
+        # Limpar session_state se o período excluído for o atual
+        if 'resultados' in st.session_state:
+            if st.session_state.get('periodo') == mes_ano:
+                st.session_state.resultados = {}
+                st.session_state.processado = False
+                st.session_state.periodo = None
+        
         return True, "Período excluído com sucesso"
     except Exception as e:
         return False, str(e)
@@ -387,6 +397,16 @@ def verificar_periodo_existente(supabase, mes_ano, gestor):
         return len(response.data) > 0
     except:
         return False
+
+def limpar_estado_sessao():
+    """Limpa o estado da sessão quando não há dados"""
+    if 'processado' in st.session_state and st.session_state.processado:
+        if 'resultados' not in st.session_state or not st.session_state.resultados:
+            st.session_state.processado = False
+            st.session_state.resultados = {}
+            st.session_state.periodo = None
+            return True
+    return False
 
 # ============================================
 # GERENCIAMENTO DE USUÁRIOS
@@ -675,7 +695,6 @@ def extrair_periodo(df_satisfacao):
     return datetime.now().strftime('%B %Y')
 
 def processar_dados(df_satisfacao, df_inativos, analistas_config):
-  def processar_dados(df_satisfacao, df_inativos, analistas_config):
     """Processa os dados e calcula todas as métricas"""
     
     # ===== DIAGNÓSTICO =====
@@ -700,7 +719,6 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
             st.warning("⚠️ A coluna de satisfação está em português (Boa/Ruim). O sistema espera 'Good'/'Bad'.")
             st.info("🔄 Convertendo automaticamente...")
             
-            # Mapeamento de conversão
             mapa_conversao = {
                 'Boa': 'Good',
                 'boa': 'Good',
@@ -716,7 +734,6 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
             
             df_satisfacao['Índice de satisfação do ticket'] = df_satisfacao['Índice de satisfação do ticket'].replace(mapa_conversao)
             
-            # Mostrar valores após conversão
             valores_convertidos = df_satisfacao['Índice de satisfação do ticket'].unique().tolist()
             st.success(f"✅ Conversão realizada! Novos valores: {valores_convertidos}")
     
@@ -759,20 +776,9 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
         total_inativos = len(inativos_analista)
         validos = total_atendimentos - total_inativos
         
-        # Verificar se há avaliações
         avaliacoes = len(tickets_analista[tickets_analista['Índice de satisfação do ticket'].isin(['Good', 'Bad'])])
         positivos = len(tickets_analista[tickets_analista['Índice de satisfação do ticket'] == 'Good'])
         negativos = len(tickets_analista[tickets_analista['Índice de satisfação do ticket'] == 'Bad'])
-        
-        # ===== DIAGNÓSTICO INDIVIDUAL =====
-        if analista == list(resultados_gestor.keys())[0] if resultados_gestor else False:
-            st.write(f"**Diagnóstico para {analista}:**")
-            st.write(f"- Total atendimentos: {total_atendimentos}")
-            st.write(f"- Inativos: {total_inativos}")
-            st.write(f"- Válidos: {validos}")
-            st.write(f"- Avaliações: {avaliacoes} (Good: {positivos}, Bad: {negativos})")
-            st.write(f"- Valores na coluna de satisfação: {tickets_analista['Índice de satisfação do ticket'].unique().tolist()}")
-        # ===== FIM DIAGNÓSTICO =====
         
         perc_avaliacoes = (avaliacoes / validos * 100) if validos > 0 else 0
         csat = (positivos / avaliacoes * 100) if avaliacoes > 0 else 0
@@ -818,6 +824,7 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
         }
     
     return resultados
+
 def calcular_media_operacao(resultados, gestor=None):
     """Calcula a média de atendimentos por agente"""
     if gestor:
@@ -1801,6 +1808,9 @@ def main():
         cadastrar_usuario()
         return
     
+    # ===== LIMPAR ESTADO DA SESSÃO =====
+    limpar_estado_sessao()
+    
     # ===== INICIALIZAR SUPABASE =====
     supabase = init_supabase()
     if supabase:
@@ -2090,6 +2100,13 @@ def main():
     
     # ===== VISUALIZAÇÃO DE RESULTADOS ATUAIS =====
     if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+        
+        # ===== VERIFICAÇÃO DE SEGURANÇA =====
+        if 'resultados' not in st.session_state or not st.session_state.resultados:
+            st.warning("⚠️ Nenhum dado disponível. Faça o upload novamente.")
+            st.session_state.processado = False
+            st.rerun()
+        
         resultados = st.session_state.resultados
         periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
         
