@@ -50,6 +50,144 @@ def init_supabase():
         return None
 
 # ============================================
+# FUNÇÕES DE RESET E DIAGNÓSTICO
+# ============================================
+
+def resetar_usuario_carine():
+    """Função para resetar o usuário Carine no Supabase"""
+    supabase = init_supabase()
+    if supabase:
+        try:
+            # Remove usuário existente
+            supabase.table('usuarios').delete().eq('usuario', 'carine').execute()
+            
+            # Recria com senha padrão
+            supabase.table('usuarios').insert({
+                'usuario': 'carine',
+                'nome': 'Carine Melo',
+                'senha': hash_senha('carine2026'),
+                'gestor': GESTOR_MARCOS,
+                'acesso_total': True
+            }).execute()
+            
+            st.success("✅ Usuário Carine resetado com sucesso!")
+            return True
+        except Exception as e:
+            st.error(f"❌ Erro ao resetar: {str(e)}")
+            return False
+    return False
+
+def adicionar_dados_teste_polyana():
+    """Função para adicionar dados de teste para a Polyana"""
+    supabase = init_supabase()
+    if supabase:
+        try:
+            # Verifica se já existem dados
+            existing = supabase.table('historico_performance').select('*').eq('gestor', GESTOR_POLYANA).eq('mes_ano', 'Maio 2026').execute()
+            if existing.data:
+                st.info("ℹ️ Dados para Polyana já existem.")
+                return True
+            
+            # Dados de exemplo para Polyana
+            dados_teste = [
+                {
+                    'mes_ano': 'Maio 2026',
+                    'analista': 'Christian Matozinho',
+                    'gestor': GESTOR_POLYANA,
+                    'csat': 88.5,
+                    'perc_avaliacoes': 26.3,
+                    'perc_envio': 73.7,
+                    'total_atendimentos': 145,
+                    'total_inativos': 5,
+                    'validos': 140,
+                    'avaliacoes': 37,
+                    'positivos': 33,
+                    'negativos': 4,
+                    'meta_csat': 86,
+                    'delta_csat': 2.5,
+                    'meta_geral': 25,
+                    'status': '🟢 Meta Superada'
+                },
+                {
+                    'mes_ano': 'Maio 2026',
+                    'analista': 'Diego Machado',
+                    'gestor': GESTOR_POLYANA,
+                    'csat': 85.2,
+                    'perc_avaliacoes': 22.1,
+                    'perc_envio': 77.9,
+                    'total_atendimentos': 138,
+                    'total_inativos': 8,
+                    'validos': 130,
+                    'avaliacoes': 29,
+                    'positivos': 25,
+                    'negativos': 4,
+                    'meta_csat': 86,
+                    'delta_csat': -0.8,
+                    'meta_geral': 25,
+                    'status': '🟡 Atenção'
+                },
+                {
+                    'mes_ano': 'Maio 2026',
+                    'analista': 'Igor Siqueira',
+                    'gestor': GESTOR_POLYANA,
+                    'csat': 92.1,
+                    'perc_avaliacoes': 28.7,
+                    'perc_envio': 71.3,
+                    'total_atendimentos': 152,
+                    'total_inativos': 3,
+                    'validos': 149,
+                    'avaliacoes': 43,
+                    'positivos': 40,
+                    'negativos': 3,
+                    'meta_csat': 86,
+                    'delta_csat': 6.1,
+                    'meta_geral': 25,
+                    'status': '🟢 Meta Superada'
+                }
+            ]
+            
+            for dado in dados_teste:
+                supabase.table('historico_performance').insert(dado).execute()
+            
+            st.success("✅ Dados de teste para Polyana adicionados com sucesso!")
+            return True
+        except Exception as e:
+            st.error(f"❌ Erro ao adicionar dados: {str(e)}")
+            return False
+    return False
+
+def diagnosticar_sistema():
+    """Função de diagnóstico do sistema"""
+    supabase = init_supabase()
+    if not supabase:
+        st.error("❌ Supabase não conectado")
+        return
+    
+    st.subheader("🔍 Diagnóstico do Sistema")
+    
+    # Verifica usuários
+    try:
+        response = supabase.table('usuarios').select('*').execute()
+        st.write("📋 Usuários cadastrados no Supabase:")
+        for user in response.data:
+            st.write(f"- **{user['usuario']}** ({user['nome']}) - Acesso Total: {user.get('acesso_total', False)}")
+    except Exception as e:
+        st.error(f"Erro ao buscar usuários: {e}")
+    
+    # Verifica períodos
+    try:
+        response = supabase.table('historico_performance').select('mes_ano, gestor').execute()
+        st.write("📊 Períodos e Gestores no Supabase:")
+        periodos = {}
+        for item in response.data:
+            key = f"{item['mes_ano']} - {item['gestor']}"
+            periodos[key] = periodos.get(key, 0) + 1
+        for key, count in periodos.items():
+            st.write(f"- {key}: {count} registros")
+    except Exception as e:
+        st.error(f"Erro ao buscar períodos: {e}")
+
+# ============================================
 # FUNÇÕES DE LEITURA DE ARQUIVOS
 # ============================================
 
@@ -254,6 +392,14 @@ def listar_periodos(supabase, gestor=None):
             query = query.eq('gestor', gestor)
         response = query.execute()
         
+        # ===== DIAGNÓSTICO =====
+        if gestor and len(response.data) == 0:
+            # Tenta buscar todos os gestores para diagnóstico
+            all_response = supabase.table('historico_performance').select('gestor').execute()
+            gestores_existentes = set([r['gestor'] for r in all_response.data])
+            if gestores_existentes:
+                st.info(f"🔍 Gestor '{gestor}' não encontrado. Gestores disponíveis: {', '.join(gestores_existentes)}")
+        
         periodos = {}
         for item in response.data:
             mes_ano = item['mes_ano']
@@ -265,6 +411,7 @@ def listar_periodos(supabase, gestor=None):
                 }
         return list(periodos.values())
     except Exception as e:
+        st.error(f"Erro ao listar períodos: {e}")
         return []
 
 def excluir_periodo(supabase, mes_ano, gestor):
@@ -478,6 +625,20 @@ def fazer_login():
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔐 Login")
     
+    # ===== BOTÃO DE DIAGNÓSTICO =====
+    with st.sidebar.expander("🔧 Ferramentas do Sistema", expanded=False):
+        if st.button("🔄 Resetar Carine", use_container_width=True):
+            resetar_usuario_carine()
+            st.rerun()
+        
+        if st.button("📥 Adicionar Dados Polyana", use_container_width=True):
+            adicionar_dados_teste_polyana()
+            st.rerun()
+        
+        if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
+            diagnosticar_sistema()
+    
+    # ===== LOGIN NORMAL =====
     usuarios = carregar_usuarios()
     usuario = st.sidebar.text_input("Usuário")
     senha = st.sidebar.text_input("Senha", type="password")
@@ -493,6 +654,13 @@ def fazer_login():
             st.rerun()
         else:
             st.sidebar.error("❌ Usuário ou senha inválidos!")
+            # ===== DIAGNÓSTICO DO ERRO =====
+            if usuario in usuarios:
+                st.sidebar.warning(f"⚠️ Usuário '{usuario}' existe, mas a senha está incorreta")
+                st.sidebar.info("💡 Use as ferramentas do sistema para resetar o usuário.")
+            else:
+                st.sidebar.warning(f"⚠️ Usuário '{usuario}' não encontrado")
+                st.sidebar.info("Usuários disponíveis: " + ", ".join(usuarios.keys()))
     
     if st.session_state.get('logado', False):
         st.sidebar.success(f"✅ Logado como {st.session_state.nome_usuario}")
@@ -501,12 +669,6 @@ def fazer_login():
             st.sidebar.info("🔑 Perfil: Coordenador - Acesso Total")
         else:
             st.sidebar.info(f"👥 Perfil: Gestor - Time: {st.session_state.gestor}")
-        
-        # ===== DIAGNÓSTICO =====
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("🔍 Diagnóstico")
-        st.sidebar.write(f"**Gestor Ativo:** {st.session_state.get('gestor', 'Nenhum')}")
-        st.sidebar.write(f"**Acesso Total:** {st.session_state.get('acesso_total', False)}")
         
         if st.session_state.get('acesso_total', False):
             if st.sidebar.button("👤 Cadastrar Usuário", use_container_width=True):
