@@ -2242,28 +2242,84 @@ def main():
         st.markdown("---")
     
     # ===== DASHBOARD PRINCIPAL =====
-    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+    
+    periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
+    
+    # ===== SELETOR DE PERÍODO NA DASHBOARD =====
+    if supabase:
+        if acesso_total:
+            periodos_disponiveis = listar_periodos(supabase)
+        else:
+            periodos_disponiveis = listar_periodos(supabase, gestor_ativo)
         
-        periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
+        if periodos_disponiveis:
+            periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
+            periodo_selecionado = st.selectbox(
+                "📅 Selecione o Período para visualizar",
+                periodos_lista,
+                index=0 if periodo in periodos_lista else 0,
+                key="seletor_periodo_dashboard"
+            )
+            if periodo_selecionado != periodo:
+                st.session_state.periodo = periodo_selecionado
+                st.rerun()
+    
+    # ===== CARREGAR DADOS COM FILTRO DE GESTOR =====
+    if acesso_total:
+        # COORDENADOR - Visualiza todos os dados
+        df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
+        st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
         
-        # ===== SELETOR DE PERÍODO NA DASHBOARD =====
-        if supabase:
-            if acesso_total:
-                periodos_disponiveis = listar_periodos(supabase)
-            else:
-                periodos_disponiveis = listar_periodos(supabase, gestor_ativo)
+        if df_historico is not None and not df_historico.empty:
+            dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
+        else:
+            st.warning(f"⚠️ Nenhum dado encontrado para o período {st.session_state.periodo}")
+    
+    else:
+        # GESTOR - Visualiza apenas sua equipe
+        st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
+        
+        # Carregar dados APENAS do gestor atual
+        df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo, gestor=gestor_ativo)
+        
+        if df_historico is not None and not df_historico.empty:
+            # Converter para dicionário
+            resultados = {}
+            for _, row in df_historico.iterrows():
+                resultados[row['analista']] = {
+                    'total_atendimentos': row['total_atendimentos'],
+                    'total_inativos': row['total_inativos'],
+                    'validos': row['validos'],
+                    'avaliacoes': row['avaliacoes'],
+                    'positivos': row['positivos'],
+                    'negativos': row['negativos'],
+                    'perc_avaliacoes': row['perc_avaliacoes'],
+                    'perc_envio': row['perc_envio'],
+                    'csat': row['csat'],
+                    'meta_csat': row['meta_csat'],
+                    'delta_csat': row['delta_csat'],
+                    'meta_geral': row['meta_geral'],
+                    'status': row['status'],
+                    'gestor': row['gestor']
+                }
             
-            if periodos_disponiveis:
-                periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
-                periodo_selecionado = st.selectbox(
-                    "📅 Selecione o Período para visualizar",
-                    periodos_lista,
-                    index=0 if periodo in periodos_lista else 0,
-                    key="seletor_periodo_dashboard"
-                )
-                if periodo_selecionado != periodo:
-                    st.session_state.periodo = periodo_selecionado
-                    st.rerun()
+            # Atualizar session_state
+            st.session_state.resultados = resultados
+            
+            # Exibir dashboard do gestor
+            dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
+        else:
+            st.warning(f"⚠️ Nenhum dado encontrado para {gestor_ativo} no período {st.session_state.periodo}")
+            
+            # Tentar carregar o último período disponível para o gestor
+            periodos_gestor = listar_periodos(supabase, gestor_ativo)
+            if periodos_gestor:
+                periodos_ordenados = sorted(periodos_gestor, key=lambda x: x['mes_ano'], reverse=True)
+                ultimo_periodo = periodos_ordenados[0]
+                st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
+                st.session_state.periodo = ultimo_periodo['mes_ano']
+                st.rerun()
         
         # ===== EXIBIR DASHBOARD POR PERFIL =====
         if acesso_total:
