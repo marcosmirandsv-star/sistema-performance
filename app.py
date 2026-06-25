@@ -67,12 +67,54 @@ def salvar_historico(supabase, dados, mes_ano, gestor):
                 'status': d['status']
             })
         
-        supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        # Verificar se já existe registro para o período
+        existing = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        
+        if existing.data:
+            return False, f"Já existe um relatório importado para o período {mes_ano}. Use a opção de substituir ou exclua o período existente."
         
         for registro in registros:
             supabase.table('historico_performance').insert(registro).execute()
         
         return True, "Salvo com sucesso"
+    except Exception as e:
+        return False, str(e)
+
+def substituir_historico(supabase, dados, mes_ano, gestor):
+    """Substitui os dados existentes no Supabase"""
+    if not supabase:
+        return False, "Supabase não configurado"
+    
+    try:
+        # Deletar registros existentes
+        supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        
+        # Inserir novos registros
+        registros = []
+        for analista, d in dados.items():
+            registros.append({
+                'mes_ano': mes_ano,
+                'analista': analista,
+                'gestor': gestor,
+                'csat': d['csat'],
+                'perc_avaliacoes': d['perc_avaliacoes'],
+                'perc_envio': d['perc_envio'],
+                'total_atendimentos': d['total_atendimentos'],
+                'total_inativos': d['total_inativos'],
+                'validos': d['validos'],
+                'avaliacoes': d['avaliacoes'],
+                'positivos': d['positivos'],
+                'negativos': d['negativos'],
+                'meta_csat': d['meta_csat'],
+                'delta_csat': d['delta_csat'],
+                'meta_geral': d['meta_geral'],
+                'status': d['status']
+            })
+        
+        for registro in registros:
+            supabase.table('historico_performance').insert(registro).execute()
+        
+        return True, "Substituído com sucesso"
     except Exception as e:
         return False, str(e)
 
@@ -96,6 +138,60 @@ def carregar_historico(supabase, mes_ano=None, gestor=None, analista=None):
     except Exception as e:
         st.error(f"Erro ao carregar histórico: {str(e)}")
         return None
+
+def listar_periodos(supabase, gestor=None):
+    """Lista todos os períodos disponíveis"""
+    if not supabase:
+        return []
+    
+    try:
+        query = supabase.table('historico_performance').select('mes_ano, gestor, data_criacao')
+        if gestor:
+            query = query.eq('gestor', gestor)
+        
+        response = query.execute()
+        
+        # Agrupar por período
+        periodos = {}
+        for item in response.data:
+            mes_ano = item['mes_ano']
+            if mes_ano not in periodos:
+                periodos[mes_ano] = {
+                    'mes_ano': mes_ano,
+                    'gestor': item['gestor'],
+                    'data_criacao': item.get('data_criacao', datetime.now().isoformat())
+                }
+        
+        return list(periodos.values())
+    except Exception as e:
+        st.error(f"Erro ao listar períodos: {str(e)}")
+        return []
+
+def excluir_periodo(supabase, mes_ano, gestor):
+    """Exclui todos os registros de um período"""
+    if not supabase:
+        return False, "Supabase não configurado"
+    
+    try:
+        supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        
+        # Remover também pódio manual associado
+        supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        
+        return True, "Período excluído com sucesso"
+    except Exception as e:
+        return False, str(e)
+
+def verificar_periodo_existente(supabase, mes_ano, gestor):
+    """Verifica se um período já existe no Supabase"""
+    if not supabase:
+        return False
+    
+    try:
+        response = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        return len(response.data) > 0
+    except:
+        return False
 
 def salvar_podio_manual(supabase, mes_ano, gestor, podio):
     """Salva edição manual do pódio"""
@@ -525,19 +621,16 @@ def calcular_podio(resultados, gestor=None, media_atendimentos=None, limiar_csat
 def criar_painel_analista(analista, dados, media_operacao, podio):
     """Cria o painel visual do analista com métricas e gráficos"""
     
-    # Verificar se o analista está no pódio
     posicao_podio = None
     for i, (nome, _, _, _) in enumerate(podio, 1):
         if nome == analista:
             posicao_podio = i
             break
     
-    # ===== MÉTRICAS EM CARDS =====
     st.subheader(f"📊 Painel de Performance - {analista}")
     
     col1, col2, col3, col4, col5 = st.columns(5)
     
-    # Card 1: CSAT
     with col1:
         delta_csat = dados['delta_csat']
         cor_delta = "green" if delta_csat >= 0 else "red"
@@ -550,7 +643,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         </div>
         """, unsafe_allow_html=True)
     
-    # Card 2: % Avaliações
     with col2:
         diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
         cor_diff = "green" if diff_avaliacoes >= 0 else "red"
@@ -563,7 +655,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         </div>
         """, unsafe_allow_html=True)
     
-    # Card 3: % Envio
     with col3:
         st.markdown(f"""
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #17a2b8;">
@@ -573,7 +664,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         </div>
         """, unsafe_allow_html=True)
     
-    # Card 4: Atendimentos
     with col4:
         diff_atend = dados['total_atendimentos'] - media_operacao
         cor_atend = "green" if diff_atend >= 0 else "red"
@@ -586,7 +676,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         </div>
         """, unsafe_allow_html=True)
     
-    # Card 5: Posição no Ranking
     with col5:
         if posicao_podio:
             medalha = ["🥇", "🥈", "🥉"][posicao_podio-1]
@@ -611,14 +700,11 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
     
     st.markdown("---")
     
-    # ===== GRÁFICOS DO ANALISTA =====
     col1, col2 = st.columns(2)
     
     with col1:
-        # Gráfico de Barras - CSAT vs Meta
         fig_barras = go.Figure()
         
-        # Barra do CSAT Alcançado
         fig_barras.add_trace(go.Bar(
             x=['CSAT'],
             y=[dados['csat']],
@@ -628,7 +714,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
             textposition='outside'
         ))
         
-        # Barra da Meta
         fig_barras.add_trace(go.Bar(
             x=['CSAT'],
             y=[dados['meta_csat']],
@@ -648,7 +733,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         )
         st.plotly_chart(fig_barras, use_container_width=True)
         
-        # Gráfico de Gauge (velocímetro) para CSAT
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=dados['csat'],
@@ -672,25 +756,19 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         st.plotly_chart(fig_gauge, use_container_width=True)
     
     with col2:
-        # Gráfico de Radar
         categorias = ['CSAT', '% Avaliações', '% Envio', 'Atendimentos']
         
-        # Normalizar valores para o radar (0-100)
         csat_norm = dados['csat']
         avaliacoes_norm = dados['perc_avaliacoes']
         envio_norm = dados['perc_envio']
         
-        # Atendimentos normalizado (baseado na média)
         if media_operacao > 0:
             atend_norm = min(100, (dados['total_atendimentos'] / media_operacao) * 100)
         else:
             atend_norm = 0
         
-        # Valores do analista
         valores_analista = [csat_norm, avaliacoes_norm, envio_norm, atend_norm]
-        
-        # Valores da meta (referência)
-        valores_meta = [dados['meta_csat'], dados['meta_geral'], 50, 100]  # 50% é referência para envio, 100% para atendimentos
+        valores_meta = [dados['meta_csat'], dados['meta_geral'], 50, 100]
         
         fig_radar = go.Figure()
         
@@ -729,7 +807,6 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
     
     st.markdown("---")
     
-    # ===== GRÁFICO DE EVOLUÇÃO (se houver mais de 1 mês) =====
     return posicao_podio
 
 # ============================================
@@ -953,7 +1030,6 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     if df_analista.empty:
         return None
     
-    # Verificar se tem mais de 1 mês
     meses = df_analista['mes_ano'].nunique()
     if meses < 2:
         return None
@@ -1516,35 +1592,92 @@ def main():
         )
         
         st.markdown("---")
+        
+        # ===== AJUSTE 1: PERÍODO OBRIGATÓRIO =====
         st.header("📅 Período")
         
-        periodo_manual = st.text_input(
-            "Informe o período (ex: Maio 2026)",
-            value=datetime.now().strftime('%B %Y')
+        # Opções de período (manual ou extraído)
+        opcao_periodo = st.radio(
+            "Como definir o período?",
+            ["Selecionar manualmente", "Extrair do arquivo"],
+            index=0
         )
+        
+        if opcao_periodo == "Selecionar manualmente":
+            # Campo com placeholder
+            periodo_manual = st.text_input(
+                "Informe o período",
+                placeholder="Ex: Maio 2026",
+                value=""
+            )
+            periodo_extraido = None
+            periodo_selecionado = periodo_manual if periodo_manual else None
+        else:
+            # Opção para extrair do arquivo (será processado depois)
+            periodo_manual = None
+            periodo_extraido = None
+            periodo_selecionado = None
+            st.info("ℹ️ O período será extraído automaticamente do arquivo após o upload.")
+        
+        # Verificação se o período está selecionado
+        periodo_valido = periodo_selecionado is not None and periodo_selecionado.strip() != ""
         
         st.markdown("---")
         
+        # ===== BOTÃO DE PROCESSAR =====
         if st.button("🚀 Processar Dados", use_container_width=True):
-            if arquivo_satisfacao and arquivo_inativos:
+            # Validar se o período foi selecionado
+            if not periodo_valido and opcao_periodo == "Selecionar manualmente":
+                st.error("⚠️ Selecione o período antes de processar o relatório.")
+            elif not arquivo_satisfacao or not arquivo_inativos:
+                st.error("❌ Envie os dois arquivos.")
+            else:
                 with st.spinner("Processando dados..."):
                     try:
                         df_satisfacao = pd.read_excel(arquivo_satisfacao)
                         df_inativos = pd.read_excel(arquivo_inativos)
                         
-                        if periodo_manual:
-                            periodo = periodo_manual
-                        else:
+                        # Extrair período se necessário
+                        if opcao_periodo == "Extrair do arquivo":
                             periodo = extrair_periodo(df_satisfacao)
+                        else:
+                            periodo = periodo_manual
                         
                         st.session_state.periodo = periodo
                         
+                        # ===== AJUSTE 2: VERIFICAR PERÍODO EXISTENTE =====
+                        gestor_logado = st.session_state.gestor
+                        if supabase:
+                            existe = verificar_periodo_existente(supabase, periodo, gestor_logado)
+                            if existe:
+                                # Mostrar aviso com opções
+                                st.warning(f"⚠️ Já existe um relatório importado para o período {periodo}.")
+                                
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    if st.button("❌ Cancelar importação", use_container_width=True):
+                                        st.stop()
+                                with col2:
+                                    if st.button("🔄 Substituir período existente", use_container_width=True):
+                                        # Processar e substituir
+                                        resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
+                                        st.session_state.resultados = resultados
+                                        st.session_state.processado = True
+                                        
+                                        sucesso, mensagem = substituir_historico(supabase, resultados, periodo, gestor_logado)
+                                        if sucesso:
+                                            st.success(f"✅ Período {periodo} substituído com sucesso!")
+                                        else:
+                                            st.error(f"❌ Erro ao substituir: {mensagem}")
+                                        st.rerun()
+                                st.stop()
+                        
+                        # Processar normalmente (se não existir)
                         resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
                         st.session_state.resultados = resultados
                         st.session_state.processado = True
                         
                         if supabase:
-                            gestor_logado = st.session_state.gestor
                             sucesso, mensagem = salvar_historico(supabase, resultados, periodo, gestor_logado)
                             if sucesso:
                                 st.success(f"✅ Dados salvos no Supabase! Período: {periodo}")
@@ -1554,10 +1687,18 @@ def main():
                             st.success(f"✅ Dados processados! Período: {periodo}")
                     except Exception as e:
                         st.error(f"❌ Erro ao processar dados: {str(e)}")
-            else:
-                st.error("❌ Envie os dois arquivos.")
         
         st.markdown("---")
+        
+        # ===== AJUSTE 3: TELA ADMINISTRATIVA DE PERÍODOS =====
+        st.header("📂 Gerenciar Períodos")
+        
+        if st.button("📊 Ver Períodos Importados", use_container_width=True):
+            st.session_state.mostrar_periodos = True
+        
+        st.markdown("---")
+        
+        # ===== BOTÃO HISTÓRICO =====
         st.header("📊 Consultar Histórico")
         
         if st.button("📊 Ver Histórico", use_container_width=True):
@@ -1575,6 +1716,81 @@ def main():
         
         if st.button("🔙 Voltar", use_container_width=True):
             st.session_state.gerenciar_analistas = False
+            st.rerun()
+        
+        st.markdown("---")
+    
+    # ===== GERENCIAR PERÍODOS =====
+    if st.session_state.get('mostrar_periodos', False):
+        st.header("📂 Gerenciar Períodos Importados")
+        
+        if supabase:
+            # Listar períodos do gestor logado ou todos (se acesso total)
+            if st.session_state.get('acesso_total', False):
+                periodos = listar_periodos(supabase)
+            else:
+                periodos = listar_periodos(supabase, st.session_state.gestor)
+            
+            if periodos:
+                # Tabela de períodos
+                dados_tabela = []
+                for p in periodos:
+                    # Contar analistas do período
+                    df_periodo = carregar_historico(supabase, mes_ano=p['mes_ano'], gestor=p['gestor'])
+                    qtd_analistas = len(df_periodo) if df_periodo is not None else 0
+                    
+                    dados_tabela.append({
+                        'Período': p['mes_ano'],
+                        'Gestor': p['gestor'],
+                        'Analistas': qtd_analistas,
+                        'Data Importação': p.get('data_criacao', 'N/A')[:10] if p.get('data_criacao') else 'N/A'
+                    })
+                
+                df_periodos = pd.DataFrame(dados_tabela)
+                st.dataframe(df_periodos, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                
+                # ===== AJUSTE 4: EXCLUSÃO SEGURA =====
+                st.subheader("🗑️ Excluir Período")
+                
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    periodo_para_excluir = st.selectbox(
+                        "Selecione o período para excluir",
+                        [p['mes_ano'] for p in periodos]
+                    )
+                
+                with col2:
+                    # Confirmar exclusão
+                    confirmar = st.checkbox("✅ Confirmar exclusão deste período")
+                
+                if st.button("🗑️ Excluir Período", use_container_width=True):
+                    if not confirmar:
+                        st.error("⚠️ Marque a caixa de confirmação antes de excluir.")
+                    else:
+                        # Encontrar o gestor do período
+                        gestor_periodo = next((p['gestor'] for p in periodos if p['mes_ano'] == periodo_para_excluir), None)
+                        
+                        if gestor_periodo:
+                            # Verificar se o usuário tem permissão
+                            if not st.session_state.get('acesso_total', False) and gestor_periodo != st.session_state.gestor:
+                                st.error("❌ Você não tem permissão para excluir este período.")
+                            else:
+                                with st.spinner(f"Excluindo período {periodo_para_excluir}..."):
+                                    sucesso, mensagem = excluir_periodo(supabase, periodo_para_excluir, gestor_periodo)
+                                    if sucesso:
+                                        st.success(f"✅ {mensagem}")
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Erro: {mensagem}")
+            else:
+                st.info("Nenhum período importado encontrado.")
+        else:
+            st.error("❌ Supabase não configurado.")
+        
+        if st.button("🔙 Voltar"):
+            st.session_state.mostrar_periodos = False
             st.rerun()
         
         st.markdown("---")
@@ -1647,7 +1863,7 @@ def main():
         st.markdown("---")
     
     # ===== VISUALIZAÇÃO DE RESULTADOS ATUAIS =====
-    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False):
+    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
         resultados = st.session_state.resultados
         periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
         
@@ -2005,7 +2221,7 @@ def main():
     st.markdown(
         """
         <div style="text-align: center; color: #666; font-size: 12px;">
-            Sistema de Performance v8.0 | Supabase + IA + Histórico
+            Sistema de Performance v9.0 | Controle de Períodos + IA + Histórico
         </div>
         """,
         unsafe_allow_html=True
