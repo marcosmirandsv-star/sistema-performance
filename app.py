@@ -40,6 +40,170 @@ def init_supabase():
             return create_client(url, key)
         return None
 
+# ============================================
+# LEITURA ROBUSTA DE ARQUIVOS
+# ============================================
+
+def normalizar_nome_coluna(nome):
+    """
+    Normaliza o nome da coluna para comparação
+    Remove espaços extras, caracteres especiais e converte para minúsculo
+    """
+    import re
+    # Converter para minúsculo
+    nome = nome.lower().strip()
+    # Remover caracteres especiais e espaços extras
+    nome = re.sub(r'[^a-záéíóúãõç0-9\s]', '', nome)
+    # Remover espaços múltiplos
+    nome = re.sub(r'\s+', ' ', nome).strip()
+    return nome
+
+def identificar_coluna_flexivel(df, padroes):
+    """
+    Identifica uma coluna baseada em padrões de nome
+    """
+    colunas = df.columns.tolist()
+    
+    for col in colunas:
+        col_normalizado = normalizar_nome_coluna(col)
+        for padrao in padroes:
+            padrao_normalizado = normalizar_nome_coluna(padrao)
+            if padrao_normalizado in col_normalizado or col_normalizado in padrao_normalizado:
+                return col
+    return None
+
+def carregar_arquivo_satisfacao(arquivo):
+    """
+    Carrega o arquivo de satisfação de forma robusta
+    """
+    try:
+        df = pd.read_excel(arquivo)
+    except Exception as e:
+        try:
+            df = pd.read_csv(arquivo, encoding='utf-8')
+        except:
+            try:
+                df = pd.read_csv(arquivo, encoding='latin-1')
+            except:
+                st.error(f"❌ Não foi possível ler o arquivo de satisfação: {str(e)}")
+                st.info("Verifique se é um arquivo Excel (.xlsx) ou CSV válido.")
+                return None
+    
+    colunas = df.columns.tolist()
+    st.info(f"🔍 Colunas encontradas no arquivo de satisfação: {', '.join(colunas)}")
+    
+    # Identificar cada coluna
+    col_id = identificar_coluna_flexivel(df, [
+        'ID do ticket', 'Ticket ID', 'ID', 'ticket_id', 'id_ticket'
+    ])
+    
+    col_satisfacao = identificar_coluna_flexivel(df, [
+        'Índice de satisfação do ticket', 'Satisfaction', 'Índice de satisfação',
+        'Ticket Satisfaction', 'satisfacao', 'status_satisfacao',
+        'índice de satisfação do ticket', 'satisfação'
+    ])
+    
+    col_atribuido = identificar_coluna_flexivel(df, [
+        'Nome do atribuído', 'Assignee', 'Atribuído', 'Responsável',
+        'assignee_name', 'nome_atribuido', 'nome do atribuído'
+    ])
+    
+    # Verificar se encontrou todas
+    if not col_id:
+        st.error("❌ Coluna 'ID do ticket' não encontrada no arquivo de satisfação.")
+        st.info(f"Colunas disponíveis: {', '.join(colunas)}")
+        return None
+    
+    if not col_satisfacao:
+        st.error("❌ Coluna de satisfação não encontrada no arquivo de satisfação.")
+        st.info(f"Colunas disponíveis: {', '.join(colunas)}")
+        return None
+    
+    if not col_atribuido:
+        st.error("❌ Coluna 'Nome do atribuído' não encontrada no arquivo de satisfação.")
+        st.info(f"Colunas disponíveis: {', '.join(colunas)}")
+        return None
+    
+    # Renomear colunas para o padrão esperado
+    df_renomeado = df.rename(columns={
+        col_id: 'ID do ticket',
+        col_satisfacao: 'Índice de satisfação do ticket',
+        col_atribuido: 'Nome do atribuído'
+    })
+    
+    # Manter apenas as colunas necessárias
+    colunas_necessarias = ['ID do ticket', 'Índice de satisfação do ticket', 'Nome do atribuído']
+    df_final = df_renomeado[colunas_necessarias].copy()
+    
+    st.success(f"✅ Arquivo de satisfação carregado! {len(df_final)} registros encontrados.")
+    
+    with st.expander("📊 Amostra dos dados de satisfação"):
+        st.dataframe(df_final.head(10))
+    
+    return df_final
+
+def carregar_arquivo_inativos(arquivo):
+    """
+    Carrega o arquivo de inativos de forma robusta
+    """
+    try:
+        df = pd.read_excel(arquivo)
+    except Exception as e:
+        try:
+            df = pd.read_csv(arquivo, encoding='utf-8')
+        except:
+            try:
+                df = pd.read_csv(arquivo, encoding='latin-1')
+            except:
+                st.error(f"❌ Não foi possível ler o arquivo de inativos: {str(e)}")
+                st.info("Verifique se é um arquivo Excel (.xlsx) ou CSV válido.")
+                return None
+    
+    colunas = df.columns.tolist()
+    st.info(f"🔍 Colunas encontradas no arquivo de inativos: {', '.join(colunas)}")
+    
+    # Identificar cada coluna
+    col_id = identificar_coluna_flexivel(df, [
+        'ID do ticket', 'Ticket ID', 'ID', 'ticket_id', 'id_ticket'
+    ])
+    
+    col_atribuido = identificar_coluna_flexivel(df, [
+        'Nome do atribuído', 'Assignee', 'Atribuído', 'Responsável',
+        'assignee_name', 'nome_atribuido', 'nome do atribuído'
+    ])
+    
+    # Verificar se encontrou todas
+    if not col_id:
+        st.error("❌ Coluna 'ID do ticket' não encontrada no arquivo de inativos.")
+        st.info(f"Colunas disponíveis: {', '.join(colunas)}")
+        return None
+    
+    if not col_atribuido:
+        st.error("❌ Coluna 'Nome do atribuído' não encontrada no arquivo de inativos.")
+        st.info(f"Colunas disponíveis: {', '.join(colunas)}")
+        return None
+    
+    # Renomear colunas para o padrão esperado
+    df_renomeado = df.rename(columns={
+        col_id: 'ID do ticket',
+        col_atribuido: 'Nome do atribuído'
+    })
+    
+    # Manter apenas as colunas necessárias
+    colunas_necessarias = ['ID do ticket', 'Nome do atribuído']
+    df_final = df_renomeado[colunas_necessarias].copy()
+    
+    st.success(f"✅ Arquivo de inativos carregado! {len(df_final)} registros encontrados.")
+    
+    with st.expander("📊 Amostra dos dados de inativos"):
+        st.dataframe(df_final.head(10))
+    
+    return df_final
+
+# ============================================
+# FUNÇÕES EXISTENTES (mantidas)
+# ============================================
+
 def salvar_historico(supabase, dados, mes_ano, gestor):
     """Salva os dados processados no Supabase"""
     if not supabase:
@@ -71,7 +235,7 @@ def salvar_historico(supabase, dados, mes_ano, gestor):
         existing = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         
         if existing.data:
-            return False, f"Já existe um relatório importado para o período {mes_ano}. Use a opção de substituir ou exclua o período existente."
+            return False, f"Já existe um relatório importado para o período {mes_ano}."
         
         for registro in registros:
             supabase.table('historico_performance').insert(registro).execute()
@@ -139,60 +303,6 @@ def carregar_historico(supabase, mes_ano=None, gestor=None, analista=None):
         st.error(f"Erro ao carregar histórico: {str(e)}")
         return None
 
-def listar_periodos(supabase, gestor=None):
-    """Lista todos os períodos disponíveis"""
-    if not supabase:
-        return []
-    
-    try:
-        query = supabase.table('historico_performance').select('mes_ano, gestor, data_criacao')
-        if gestor:
-            query = query.eq('gestor', gestor)
-        
-        response = query.execute()
-        
-        # Agrupar por período
-        periodos = {}
-        for item in response.data:
-            mes_ano = item['mes_ano']
-            if mes_ano not in periodos:
-                periodos[mes_ano] = {
-                    'mes_ano': mes_ano,
-                    'gestor': item['gestor'],
-                    'data_criacao': item.get('data_criacao', datetime.now().isoformat())
-                }
-        
-        return list(periodos.values())
-    except Exception as e:
-        st.error(f"Erro ao listar períodos: {str(e)}")
-        return []
-
-def excluir_periodo(supabase, mes_ano, gestor):
-    """Exclui todos os registros de um período"""
-    if not supabase:
-        return False, "Supabase não configurado"
-    
-    try:
-        supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
-        
-        # Remover também pódio manual associado
-        supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
-        
-        return True, "Período excluído com sucesso"
-    except Exception as e:
-        return False, str(e)
-
-def verificar_periodo_existente(supabase, mes_ano, gestor):
-    """Verifica se um período já existe no Supabase"""
-    if not supabase:
-        return False
-    
-    try:
-        response = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
-        return len(response.data) > 0
-    except:
-        return False
-
 def salvar_podio_manual(supabase, mes_ano, gestor, podio):
     """Salva edição manual do pódio"""
     if not supabase:
@@ -227,6 +337,56 @@ def carregar_podio_manual(supabase, mes_ano, gestor):
         return None
     except Exception as e:
         return None
+
+def listar_periodos(supabase, gestor=None):
+    """Lista todos os períodos disponíveis"""
+    if not supabase:
+        return []
+    
+    try:
+        query = supabase.table('historico_performance').select('mes_ano, gestor, data_criacao')
+        if gestor:
+            query = query.eq('gestor', gestor)
+        
+        response = query.execute()
+        
+        periodos = {}
+        for item in response.data:
+            mes_ano = item['mes_ano']
+            if mes_ano not in periodos:
+                periodos[mes_ano] = {
+                    'mes_ano': mes_ano,
+                    'gestor': item['gestor'],
+                    'data_criacao': item.get('data_criacao', datetime.now().isoformat())
+                }
+        
+        return list(periodos.values())
+    except Exception as e:
+        st.error(f"Erro ao listar períodos: {str(e)}")
+        return []
+
+def excluir_periodo(supabase, mes_ano, gestor):
+    """Exclui todos os registros de um período"""
+    if not supabase:
+        return False, "Supabase não configurado"
+    
+    try:
+        supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        return True, "Período excluído com sucesso"
+    except Exception as e:
+        return False, str(e)
+
+def verificar_periodo_existente(supabase, mes_ano, gestor):
+    """Verifica se um período já existe no Supabase"""
+    if not supabase:
+        return False
+    
+    try:
+        response = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        return len(response.data) > 0
+    except:
+        return False
 
 # ============================================
 # GERENCIAMENTO DE USUÁRIOS
@@ -1583,20 +1743,19 @@ def main():
         
         arquivo_satisfacao = st.file_uploader(
             "Arquivo de Satisfação (Good vs Bad)",
-            type=['xlsx']
+            type=['xlsx', 'csv']
         )
         
         arquivo_inativos = st.file_uploader(
             "Arquivo de Inatividade",
-            type=['xlsx']
+            type=['xlsx', 'csv']
         )
         
         st.markdown("---")
         
-        # ===== AJUSTE 1: PERÍODO OBRIGATÓRIO =====
+        # Período
         st.header("📅 Período")
         
-        # Opções de período (manual ou extraído)
         opcao_periodo = st.radio(
             "Como definir o período?",
             ["Selecionar manualmente", "Extrair do arquivo"],
@@ -1604,29 +1763,24 @@ def main():
         )
         
         if opcao_periodo == "Selecionar manualmente":
-            # Campo com placeholder
             periodo_manual = st.text_input(
                 "Informe o período",
                 placeholder="Ex: Maio 2026",
                 value=""
             )
-            periodo_extraido = None
             periodo_selecionado = periodo_manual if periodo_manual else None
         else:
-            # Opção para extrair do arquivo (será processado depois)
             periodo_manual = None
-            periodo_extraido = None
             periodo_selecionado = None
             st.info("ℹ️ O período será extraído automaticamente do arquivo após o upload.")
         
-        # Verificação se o período está selecionado
         periodo_valido = periodo_selecionado is not None and periodo_selecionado.strip() != ""
         
         st.markdown("---")
         
-        # ===== BOTÃO DE PROCESSAR =====
+        # Botão Processar
         if st.button("🚀 Processar Dados", use_container_width=True):
-            # Validar se o período foi selecionado
+            # Validar período
             if not periodo_valido and opcao_periodo == "Selecionar manualmente":
                 st.error("⚠️ Selecione o período antes de processar o relatório.")
             elif not arquivo_satisfacao or not arquivo_inativos:
@@ -1634,10 +1788,16 @@ def main():
             else:
                 with st.spinner("Processando dados..."):
                     try:
-                        df_satisfacao = pd.read_excel(arquivo_satisfacao)
-                        df_inativos = pd.read_excel(arquivo_inativos)
+                        # Carregar arquivos de forma robusta
+                        df_satisfacao = carregar_arquivo_satisfacao(arquivo_satisfacao)
+                        if df_satisfacao is None:
+                            st.stop()
                         
-                        # Extrair período se necessário
+                        df_inativos = carregar_arquivo_inativos(arquivo_inativos)
+                        if df_inativos is None:
+                            st.stop()
+                        
+                        # Extrair período
                         if opcao_periodo == "Extrair do arquivo":
                             periodo = extrair_periodo(df_satisfacao)
                         else:
@@ -1645,12 +1805,11 @@ def main():
                         
                         st.session_state.periodo = periodo
                         
-                        # ===== AJUSTE 2: VERIFICAR PERÍODO EXISTENTE =====
+                        # Verificar período existente
                         gestor_logado = st.session_state.gestor
                         if supabase:
                             existe = verificar_periodo_existente(supabase, periodo, gestor_logado)
                             if existe:
-                                # Mostrar aviso com opções
                                 st.warning(f"⚠️ Já existe um relatório importado para o período {periodo}.")
                                 
                                 col1, col2 = st.columns(2)
@@ -1659,7 +1818,6 @@ def main():
                                         st.stop()
                                 with col2:
                                     if st.button("🔄 Substituir período existente", use_container_width=True):
-                                        # Processar e substituir
                                         resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
                                         st.session_state.resultados = resultados
                                         st.session_state.processado = True
@@ -1672,7 +1830,7 @@ def main():
                                         st.rerun()
                                 st.stop()
                         
-                        # Processar normalmente (se não existir)
+                        # Processar normalmente
                         resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
                         st.session_state.resultados = resultados
                         st.session_state.processado = True
@@ -1687,10 +1845,11 @@ def main():
                             st.success(f"✅ Dados processados! Período: {periodo}")
                     except Exception as e:
                         st.error(f"❌ Erro ao processar dados: {str(e)}")
+                        st.info("Verifique se os arquivos estão no formato correto.")
         
         st.markdown("---")
         
-        # ===== AJUSTE 3: TELA ADMINISTRATIVA DE PERÍODOS =====
+        # Gerenciar Períodos
         st.header("📂 Gerenciar Períodos")
         
         if st.button("📊 Ver Períodos Importados", use_container_width=True):
@@ -1698,7 +1857,7 @@ def main():
         
         st.markdown("---")
         
-        # ===== BOTÃO HISTÓRICO =====
+        # Consultar Histórico
         st.header("📊 Consultar Histórico")
         
         if st.button("📊 Ver Histórico", use_container_width=True):
@@ -1725,17 +1884,14 @@ def main():
         st.header("📂 Gerenciar Períodos Importados")
         
         if supabase:
-            # Listar períodos do gestor logado ou todos (se acesso total)
             if st.session_state.get('acesso_total', False):
                 periodos = listar_periodos(supabase)
             else:
                 periodos = listar_periodos(supabase, st.session_state.gestor)
             
             if periodos:
-                # Tabela de períodos
                 dados_tabela = []
                 for p in periodos:
-                    # Contar analistas do período
                     df_periodo = carregar_historico(supabase, mes_ano=p['mes_ano'], gestor=p['gestor'])
                     qtd_analistas = len(df_periodo) if df_periodo is not None else 0
                     
@@ -1751,7 +1907,6 @@ def main():
                 
                 st.markdown("---")
                 
-                # ===== AJUSTE 4: EXCLUSÃO SEGURA =====
                 st.subheader("🗑️ Excluir Período")
                 
                 col1, col2 = st.columns([2, 1])
@@ -1762,18 +1917,15 @@ def main():
                     )
                 
                 with col2:
-                    # Confirmar exclusão
                     confirmar = st.checkbox("✅ Confirmar exclusão deste período")
                 
                 if st.button("🗑️ Excluir Período", use_container_width=True):
                     if not confirmar:
                         st.error("⚠️ Marque a caixa de confirmação antes de excluir.")
                     else:
-                        # Encontrar o gestor do período
                         gestor_periodo = next((p['gestor'] for p in periodos if p['mes_ano'] == periodo_para_excluir), None)
                         
                         if gestor_periodo:
-                            # Verificar se o usuário tem permissão
                             if not st.session_state.get('acesso_total', False) and gestor_periodo != st.session_state.gestor:
                                 st.error("❌ Você não tem permissão para excluir este período.")
                             else:
@@ -1867,7 +2019,7 @@ def main():
         resultados = st.session_state.resultados
         periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
         
-        # ===== FILTRO POR GESTOR OU ACESSO TOTAL =====
+        # ===== FILTRO POR GESTOR =====
         if st.session_state.get('acesso_total', False):
             gestor_selecionado = None
             resultados_filtrados = resultados
@@ -2065,7 +2217,7 @@ def main():
                 podio
             )
             
-            # ===== 2. GRÁFICO DE EVOLUÇÃO (se houver 2+ meses) =====
+            # ===== 2. GRÁFICO DE EVOLUÇÃO =====
             if supabase:
                 df_historico_analista = carregar_historico(
                     supabase, 
