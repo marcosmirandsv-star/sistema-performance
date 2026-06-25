@@ -15,6 +15,14 @@ import requests
 import calendar
 
 # ============================================
+# CONSTANTES DE GESTORES (NOMES CORRETOS)
+# ============================================
+
+GESTOR_MARCOS = "Sua Gestão - Chat Notas"
+GESTOR_POLYANA = "Gestão Polyana Ventura - Chat Outros"
+GESTORES_VALIDOS = [GESTOR_MARCOS, GESTOR_POLYANA]
+
+# ============================================
 # CONFIGURAÇÕES INICIAIS
 # ============================================
 
@@ -325,13 +333,14 @@ def salvar_podio_manual(supabase, mes_ano, gestor, podio):
         return False, str(e)
 
 # ============================================
-# GERENCIAMENTO DE USUÁRIOS
+# GERENCIAMENTO DE USUÁRIOS (COM NOMES CORRETOS)
 # ============================================
 
 def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
 def carregar_usuarios():
+    """Carrega usuários com os nomes de gestor corretos"""
     supabase = init_supabase()
     if supabase:
         try:
@@ -359,19 +368,19 @@ def carregar_usuarios():
         "marcos": {
             "senha": hash_senha("marcos2026"),
             "nome": "Marcos Miranda",
-            "gestor": "Marcos Miranda - Chat Notas",
+            "gestor": GESTOR_MARCOS,
             "acesso_total": True
         },
         "polyana": {
             "senha": hash_senha("polyana2026"),
             "nome": "Polyana Ventura",
-            "gestor": "Polyana Ventura - Chat Outros",
+            "gestor": GESTOR_POLYANA,
             "acesso_total": False
         },
         "carine": {
             "senha": hash_senha("carine2026"),
             "nome": "Carine Melo",
-            "gestor": "Marcos Miranda - Chat Notas",
+            "gestor": GESTOR_MARCOS,
             "acesso_total": True
         }
     }
@@ -399,10 +408,11 @@ def salvar_usuario_supabase(supabase, usuario, nome, senha_hash, gestor, acesso_
         return False
 
 # ============================================
-# GERENCIAMENTO DE ANALISTAS
+# GERENCIAMENTO DE ANALISTAS (COM NOMES CORRETOS)
 # ============================================
 
 def carregar_analistas():
+    """Carrega analistas com os nomes de gestor corretos"""
     try:
         if os.path.exists('analistas.json'):
             with open('analistas.json', 'r', encoding='utf-8') as f:
@@ -411,7 +421,7 @@ def carregar_analistas():
         pass
     
     config = {
-        "Marcos Miranda - Chat Notas": {
+        GESTOR_MARCOS: {
             "gestor": "Marcos Miranda",
             "meta_geral_avaliacoes": 25,
             "membros": {
@@ -426,7 +436,7 @@ def carregar_analistas():
                 "Vanessa Silva": {"meta_csat": 86, "ativo": True}
             }
         },
-        "Polyana Ventura - Chat Outros": {
+        GESTOR_POLYANA: {
             "gestor": "Polyana Ventura",
             "meta_geral_avaliacoes": 25,
             "membros": {
@@ -492,6 +502,12 @@ def fazer_login():
         else:
             st.sidebar.info(f"👥 Perfil: Gestor - Time: {st.session_state.gestor}")
         
+        # ===== DIAGNÓSTICO =====
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("🔍 Diagnóstico")
+        st.sidebar.write(f"**Gestor Ativo:** {st.session_state.get('gestor', 'Nenhum')}")
+        st.sidebar.write(f"**Acesso Total:** {st.session_state.get('acesso_total', False)}")
+        
         if st.session_state.get('acesso_total', False):
             if st.sidebar.button("👤 Cadastrar Usuário", use_container_width=True):
                 st.session_state.cadastrar_usuario = True
@@ -521,7 +537,7 @@ def cadastrar_usuario():
         confirma_senha = st.text_input("Confirmar senha", type="password")
         gestor_usuario = st.selectbox(
             "Gestor",
-            ["Marcos Miranda - Chat Notas", "Polyana Ventura - Chat Outros"]
+            GESTORES_VALIDOS
         )
         acesso_total = st.checkbox("🔑 Acesso Total ao Sistema (Coordenador)", value=False)
     
@@ -685,18 +701,18 @@ def calcular_podio(resultados, media_atendimentos=None, limiar_csat=90):
     return [(nome, dados['csat'], dados['total_atendimentos'], dados['perc_avaliacoes']) for nome, dados in top_3]
 
 # ============================================
-# DASHBOARD GESTOR - FILTRADA
+# DASHBOARD GESTOR
 # ============================================
 
-def dashboard_gestor_filtrada(periodo, gestor_nome, supabase):
-    """Dashboard específica para Gestor - mostra apenas sua equipe com dados do Supabase"""
+def dashboard_gestor(periodo, gestor_nome, supabase):
+    """Dashboard específica para Gestor - mostra apenas sua equipe"""
     
     # Carregar dados do período e gestor
     df_historico = carregar_historico(supabase, mes_ano=periodo, gestor=gestor_nome)
     
     if df_historico is None or df_historico.empty:
         st.warning(f"⚠️ Nenhum dado encontrado para {gestor_nome} no período {periodo}")
-        return
+        return None
     
     # Converter para dicionário
     resultados = {}
@@ -742,7 +758,7 @@ def dashboard_gestor_filtrada(periodo, gestor_nome, supabase):
     st.info(f"📅 Período: {periodo} | 👤 Gestor: {gestor_nome}")
     st.markdown("---")
     
-    # Top e Bottom Performers da equipe
+    # Top e Bottom Performers
     col1, col2 = st.columns(2)
     
     with col1:
@@ -756,8 +772,6 @@ def dashboard_gestor_filtrada(periodo, gestor_nome, supabase):
                     <b>{medalha} {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-            st.info("Nenhum analista encontrado.")
     
     with col2:
         st.subheader("📊 Oportunidades de Melhoria")
@@ -769,12 +783,10 @@ def dashboard_gestor_filtrada(periodo, gestor_nome, supabase):
                     <b>{i}º {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-            st.info("Nenhum analista encontrado.")
     
     st.markdown("---")
     
-    # Gráficos da equipe
+    # Gráficos
     st.subheader("📊 Análise da Equipe")
     df_dashboard = pd.DataFrame([
         {
@@ -791,7 +803,7 @@ def dashboard_gestor_filtrada(periodo, gestor_nome, supabase):
     if not df_dashboard.empty:
         criar_graficos_dashboard(df_dashboard)
     
-    # Tabela de Desempenho da equipe
+    # Tabela
     st.subheader("📋 Desempenho da Equipe")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
@@ -930,7 +942,7 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
 
 # ============================================
-# FUNÇÕES DE VISUALIZAÇÃO - GRÁFICOS
+# FUNÇÕES DE VISUALIZAÇÃO
 # ============================================
 
 def criar_graficos_dashboard(df_dashboard):
@@ -1000,51 +1012,6 @@ def criar_graficos_dashboard(df_dashboard):
         )
         fig_scatter.update_layout(height=400)
         st.plotly_chart(fig_scatter, use_container_width=True)
-    
-    st.subheader("📊 Distribuição de Status - Métricas Agregadas")
-    
-    status_agg = df_dashboard.groupby('Status').agg({
-        'Analista': 'count',
-        '% Avaliações': 'mean',
-        '% Envio': 'mean',
-        'CSAT': 'mean'
-    }).reset_index()
-    status_agg.columns = ['Status', 'Quantidade', '% Avaliações Médio', '% Envio Médio', 'CSAT Médio']
-    status_agg['%'] = (status_agg['Quantidade'] / len(df_dashboard) * 100).round(1)
-    
-    fig_stacked = go.Figure()
-    fig_stacked.add_trace(go.Bar(
-        name='% Avaliações',
-        x=status_agg['Status'],
-        y=status_agg['% Avaliações Médio'],
-        text=status_agg['% Avaliações Médio'].apply(lambda x: f'{x:.1f}%'),
-        textposition='outside',
-        marker_color='#2ecc71'
-    ))
-    fig_stacked.add_trace(go.Bar(
-        name='% Envio',
-        x=status_agg['Status'],
-        y=status_agg['% Envio Médio'],
-        text=status_agg['% Envio Médio'].apply(lambda x: f'{x:.1f}%'),
-        textposition='outside',
-        marker_color='#e74c3c'
-    ))
-    fig_stacked.add_trace(go.Bar(
-        name='CSAT Médio',
-        x=status_agg['Status'],
-        y=status_agg['CSAT Médio'],
-        text=status_agg['CSAT Médio'].apply(lambda x: f'{x:.1f}%'),
-        textposition='outside',
-        marker_color='#3498db'
-    ))
-    fig_stacked.update_layout(
-        title='📊 Distribuição por Status',
-        barmode='group',
-        height=450,
-        yaxis_title='Percentual (%)',
-        legend_title='Métrica'
-    )
-    st.plotly_chart(fig_stacked, use_container_width=True)
 
 def criar_graficos_dashboard_coordenador(df_dashboard):
     if df_dashboard.empty:
@@ -1107,7 +1074,7 @@ def criar_graficos_dashboard_coordenador(df_dashboard):
     st.plotly_chart(fig_scatter_gestor, use_container_width=True)
 
 # ============================================
-# FUNÇÕES DE RELATÓRIOS (MANTIDAS)
+# FUNÇÕES DE RELATÓRIOS
 # ============================================
 
 def gerar_analise_tecnica(analista, dados, media_operacao, podio):
@@ -1913,7 +1880,7 @@ def main():
                         
                         st.session_state.periodo = periodo
                         
-                        gestor_salvar = st.session_state.get('gestor', 'Marcos Miranda - Chat Notas')
+                        gestor_salvar = st.session_state.get('gestor', GESTOR_MARCOS)
                         
                         if supabase:
                             existe = verificar_periodo_existente(supabase, periodo, gestor_salvar)
@@ -2161,7 +2128,7 @@ def main():
             dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
         else:
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
-            resultados = dashboard_gestor_filtrada(st.session_state.periodo, gestor_ativo, supabase)
+            resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
             
             if resultados:
                 st.markdown("---")
