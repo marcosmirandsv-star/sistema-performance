@@ -701,6 +701,219 @@ def calcular_podio(resultados, media_atendimentos=None, limiar_csat=90):
     return [(nome, dados['csat'], dados['total_atendimentos'], dados['perc_avaliacoes']) for nome, dados in top_3]
 
 # ============================================
+# FUNÇÕES DE DASHBOARD VISUAL
+# ============================================
+
+def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=90):
+    """
+    Cria cards modernos para os indicadores principais
+    """
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #2ecc71;">
+            <p style="font-size: 14px; color: #666; margin: 0;">📊 Total de Registros</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0;">{dados.get('total_registros', 0)}</p>
+            <p style="font-size: 12px; color: #999; margin: 0;">Analistas no período</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        cor_csat = "#2ecc71" if dados.get('csat_medio', 0) >= meta_csat else "#e74c3c"
+        st.markdown(f"""
+        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_csat};">
+            <p style="font-size: 14px; color: #666; margin: 0;">⭐ CSAT Médio</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {cor_csat};">{dados.get('csat_medio', 0):.2f}%</p>
+            <p style="font-size: 12px; color: #999; margin: 0;">Meta: {meta_csat}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        cor_avaliacoes = "#2ecc71" if dados.get('perc_avaliacoes_medio', 0) >= meta_avaliacoes else "#e74c3c"
+        st.markdown(f"""
+        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_avaliacoes};">
+            <p style="font-size: 14px; color: #666; margin: 0;">📝 % Avaliações Médio</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {cor_avaliacoes};">{dados.get('perc_avaliacoes_medio', 0):.2f}%</p>
+            <p style="font-size: 12px; color: #999; margin: 0;">Meta: {meta_avaliacoes}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        cor_envio = "#2ecc71" if dados.get('perc_envio_medio', 0) >= meta_envio else "#e74c3c"
+        st.markdown(f"""
+        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_envio};">
+            <p style="font-size: 14px; color: #666; margin: 0;">📤 % Envio Médio</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {cor_envio};">{dados.get('perc_envio_medio', 0):.2f}%</p>
+            <p style="font-size: 12px; color: #999; margin: 0;">Meta: {meta_envio}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat=90, meta_avaliacoes=25, meta_envio=90):
+    """
+    Cria a seção "Saúde da Equipe" com semáforos
+    """
+    st.subheader("🚦 Saúde da Equipe")
+    
+    # Determinar status do CSAT
+    if csat_medio >= meta_csat:
+        cor_csat = "🟢"
+        status_csat = "Saudável"
+        bg_csat = "#d4edda"
+    elif csat_medio >= meta_csat - 2:
+        cor_csat = "🟡"
+        status_csat = "Atenção"
+        bg_csat = "#fff3cd"
+    else:
+        cor_csat = "🔴"
+        status_csat = "Crítico"
+        bg_csat = "#f8d7da"
+    
+    # Determinar status das Avaliações
+    if perc_avaliacoes_medio >= meta_avaliacoes:
+        cor_avaliacoes = "🟢"
+        status_avaliacoes = "Saudável"
+        bg_avaliacoes = "#d4edda"
+    elif perc_avaliacoes_medio >= meta_avaliacoes - 5:
+        cor_avaliacoes = "🟡"
+        status_avaliacoes = "Atenção"
+        bg_avaliacoes = "#fff3cd"
+    else:
+        cor_avaliacoes = "🔴"
+        status_avaliacoes = "Crítico"
+        bg_avaliacoes = "#f8d7da"
+    
+    # Determinar status do Envio
+    if perc_envio_medio >= meta_envio:
+        cor_envio = "🟢"
+        status_envio = "Saudável"
+        bg_envio = "#d4edda"
+    elif perc_envio_medio >= 80:
+        cor_envio = "🟡"
+        status_envio = "Atenção"
+        bg_envio = "#fff3cd"
+    else:
+        cor_envio = "🔴"
+        status_envio = "Crítico"
+        bg_envio = "#f8d7da"
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: {bg_csat}; padding: 15px; border-radius: 10px; text-align: center;">
+            <p style="font-size: 24px; margin: 0;">{cor_csat}</p>
+            <p style="font-size: 18px; font-weight: bold; margin: 0;">CSAT</p>
+            <p style="font-size: 14px; color: #333;">{csat_medio:.2f}%</p>
+            <p style="font-size: 12px; color: #666;">Status: {status_csat}</p>
+            <p style="font-size: 11px; color: #999;">Meta: {meta_csat}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: {bg_avaliacoes}; padding: 15px; border-radius: 10px; text-align: center;">
+            <p style="font-size: 24px; margin: 0;">{cor_avaliacoes}</p>
+            <p style="font-size: 18px; font-weight: bold; margin: 0;">Avaliações</p>
+            <p style="font-size: 14px; color: #333;">{perc_avaliacoes_medio:.2f}%</p>
+            <p style="font-size: 12px; color: #666;">Status: {status_avaliacoes}</p>
+            <p style="font-size: 11px; color: #999;">Meta: {meta_avaliacoes}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div style="background: {bg_envio}; padding: 15px; border-radius: 10px; text-align: center;">
+            <p style="font-size: 24px; margin: 0;">{cor_envio}</p>
+            <p style="font-size: 18px; font-weight: bold; margin: 0;">Envio</p>
+            <p style="font-size: 14px; color: #333;">{perc_envio_medio:.2f}%</p>
+            <p style="font-size: 12px; color: #666;">Status: {status_envio}</p>
+            <p style="font-size: 11px; color: #999;">Meta: {meta_envio}%</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+
+def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_label=None):
+    """
+    Cria gráfico de evolução individual
+    """
+    if df_historico is None or df_historico.empty:
+        return None
+    
+    # Ordenar por mês
+    meses_ordenados = ordenar_meses(df_historico['mes_ano'].unique().tolist())
+    df_ordenado = df_historico.copy()
+    df_ordenado['ordem'] = df_ordenado['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
+    df_ordenado = df_ordenado.sort_values('ordem')
+    
+    fig = go.Figure()
+    
+    # Linha principal
+    fig.add_trace(go.Scatter(
+        x=df_ordenado['mes_ano'],
+        y=df_ordenado[coluna],
+        mode='lines+markers',
+        name=titulo,
+        line=dict(color=cor, width=3),
+        marker=dict(size=8, color=cor),
+        hovertemplate='<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
+    ))
+    
+    # Linha de meta (se fornecida)
+    if meta is not None:
+        meta_data = [meta] * len(df_ordenado)
+        fig.add_trace(go.Scatter(
+            x=df_ordenado['mes_ano'],
+            y=meta_data,
+            mode='lines',
+            name=meta_label if meta_label else 'Meta',
+            line=dict(color='red', width=2, dash='dash'),
+            hovertemplate='<b>%{x}</b><br>Meta: %{y:.0f}%<extra></extra>'
+        ))
+    
+    fig.update_layout(
+        height=350,
+        margin=dict(l=20, r=20, t=40, b=20),
+        yaxis=dict(
+            title='Percentual (%)',
+            range=[0, 100],
+            gridcolor='#f0f0f0'
+        ),
+        xaxis=dict(
+            title='Período',
+            gridcolor='#f0f0f0'
+        ),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='center',
+            x=0.5
+        ),
+        hovermode='x unified',
+        plot_bgcolor='white'
+    )
+    
+    return fig
+
+def ordenar_meses(meses):
+    ordem_meses = {
+        'January': 1, 'February': 2, 'March': 3, 'April': 4,
+        'May': 5, 'June': 6, 'July': 7, 'August': 8,
+        'September': 9, 'October': 10, 'November': 11, 'December': 12,
+        'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
+        'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
+        'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
+    }
+    
+    def get_ordem(mes):
+        nome_mes = mes.split()[0] if mes else mes
+        return ordem_meses.get(nome_mes, 13)
+    
+    return sorted(meses, key=get_ordem)
+
+# ============================================
 # DASHBOARD GESTOR
 # ============================================
 
@@ -734,31 +947,90 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
             'gestor': row['gestor']
         }
     
-    # Métricas da equipe
+    # Calcular métricas agregadas
     total_analistas = len(resultados)
     total_atendimentos = sum([d['total_atendimentos'] for d in resultados.values()])
     media_atendimentos = total_atendimentos / total_analistas if total_analistas > 0 else 0
     csat_medio = sum([d['csat'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
+    perc_avaliacoes_medio = sum([d['perc_avaliacoes'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
+    perc_envio_medio = sum([d['perc_envio'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
     metas_superadas = len([d for d in resultados.values() if d['status'] == '🟢 Meta Superada'])
     
-    st.subheader(f"📊 Dashboard da Equipe - {gestor_nome}")
+    # ===== CARDS DE INDICADORES =====
+    dados_cards = {
+        'total_registros': total_analistas,
+        'csat_medio': csat_medio,
+        'perc_avaliacoes_medio': perc_avaliacoes_medio,
+        'perc_envio_medio': perc_envio_medio
+    }
     
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.metric("📊 Analistas", total_analistas)
-    with col2:
-        st.metric("⭐ CSAT Médio", f"{csat_medio:.2f}%")
-    with col3:
-        st.metric("💬 Atendimentos", f"{total_atendimentos:,}")
-    with col4:
-        st.metric("📈 Média Atend.", f"{media_atendimentos:.0f}")
-    with col5:
-        st.metric("🏆 Metas Superadas", f"{metas_superadas}/{total_analistas}")
+    meta_csat = 90
+    meta_avaliacoes = 25
+    meta_envio = 90
     
-    st.info(f"📅 Período: {periodo} | 👤 Gestor: {gestor_nome}")
+    criar_cards_indicadores(dados_cards, meta_csat, meta_avaliacoes, meta_envio)
+    
+    st.info(f"📅 Período: {periodo} | 👤 Gestor: {gestor_nome} | 🏆 Metas Superadas: {metas_superadas}/{total_analistas}")
     st.markdown("---")
     
-    # Top e Bottom Performers
+    # ===== SAÚDE DA EQUIPE =====
+    criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat, meta_avaliacoes, meta_envio)
+    
+    # ===== GRÁFICOS DE EVOLUÇÃO =====
+    st.subheader("📈 Evolução dos Indicadores")
+    
+    # Carregar histórico completo do gestor para evolução
+    df_historico_completo = carregar_historico(supabase, gestor=gestor_nome)
+    
+    if df_historico_completo is not None and not df_historico_completo.empty:
+        # Agrupar por mês
+        df_mensal = df_historico_completo.groupby('mes_ano').agg({
+            'csat': 'mean',
+            'perc_avaliacoes': 'mean',
+            'perc_envio': 'mean'
+        }).reset_index()
+        
+        # Gráfico 1 - CSAT
+        fig_csat = criar_grafico_evolucao(
+            df_mensal, 
+            'csat', 
+            'CSAT Médio', 
+            '#2ecc71',
+            meta=meta_csat,
+            meta_label=f'Meta: {meta_csat}%'
+        )
+        if fig_csat:
+            st.plotly_chart(fig_csat, use_container_width=True)
+        
+        # Gráfico 2 - Avaliações
+        fig_avaliacoes = criar_grafico_evolucao(
+            df_mensal, 
+            'perc_avaliacoes', 
+            '% Avaliações Médio', 
+            '#3498db',
+            meta=meta_avaliacoes,
+            meta_label=f'Meta: {meta_avaliacoes}%'
+        )
+        if fig_avaliacoes:
+            st.plotly_chart(fig_avaliacoes, use_container_width=True)
+        
+        # Gráfico 3 - Envio
+        fig_envio = criar_grafico_evolucao(
+            df_mensal, 
+            'perc_envio', 
+            '% Envio Médio', 
+            '#f39c12',
+            meta=meta_envio,
+            meta_label=f'Meta: {meta_envio}%'
+        )
+        if fig_envio:
+            st.plotly_chart(fig_envio, use_container_width=True)
+    else:
+        st.info("Dados insuficientes para gráficos de evolução. Importe mais meses.")
+    
+    st.markdown("---")
+    
+    # ===== TOP E BOTTOM PERFORMERS =====
     col1, col2 = st.columns(2)
     
     with col1:
@@ -786,24 +1058,7 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     
     st.markdown("---")
     
-    # Gráficos
-    st.subheader("📊 Análise da Equipe")
-    df_dashboard = pd.DataFrame([
-        {
-            'Analista': nome,
-            'CSAT': dados['csat'],
-            '% Avaliações': dados['perc_avaliacoes'],
-            '% Envio': dados['perc_envio'],
-            '💬 Atendimentos': dados['total_atendimentos'],
-            'Status': dados['status']
-        }
-        for nome, dados in resultados.items()
-    ])
-    
-    if not df_dashboard.empty:
-        criar_graficos_dashboard(df_dashboard)
-    
-    # Tabela
+    # ===== TABELA DE DESEMPENHO =====
     st.subheader("📋 Desempenho da Equipe")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
@@ -859,26 +1114,80 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     total_atendimentos = sum([d['total_atendimentos'] for d in resultados.values()])
     media_atendimentos = total_atendimentos / total_analistas if total_analistas > 0 else 0
     csat_medio = sum([d['csat'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
+    perc_avaliacoes_medio = sum([d['perc_avaliacoes'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
+    perc_envio_medio = sum([d['perc_envio'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
     metas_superadas = len([d for d in resultados.values() if d['status'] == '🟢 Meta Superada'])
     
-    st.subheader(f"📊 Visão Consolidada da Operação")
+    # ===== CARDS DE INDICADORES =====
+    dados_cards = {
+        'total_registros': total_analistas,
+        'csat_medio': csat_medio,
+        'perc_avaliacoes_medio': perc_avaliacoes_medio,
+        'perc_envio_medio': perc_envio_medio
+    }
     
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.metric("📊 Total Analistas", total_analistas)
-    with col2:
-        st.metric("⭐ CSAT Médio Geral", f"{csat_medio:.2f}%")
-    with col3:
-        st.metric("💬 Total Atendimentos", f"{total_atendimentos:,}")
-    with col4:
-        st.metric("📈 Média Atend.", f"{media_atendimentos:.0f}")
-    with col5:
-        st.metric("🏆 Metas Superadas", f"{metas_superadas}/{total_analistas}")
+    meta_csat = 90
+    meta_avaliacoes = 25
+    meta_envio = 90
     
-    st.info(f"📅 Período: {periodo} | 👤 Coordenador: {nome_usuario}")
+    criar_cards_indicadores(dados_cards, meta_csat, meta_avaliacoes, meta_envio)
+    
+    st.info(f"📅 Período: {periodo} | 👤 Coordenador: {nome_usuario} | 🏆 Metas Superadas: {metas_superadas}/{total_analistas}")
     st.markdown("---")
     
-    # Ranking Geral
+    # ===== SAÚDE DA OPERAÇÃO =====
+    criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat, meta_avaliacoes, meta_envio)
+    
+    # ===== GRÁFICOS DE EVOLUÇÃO =====
+    st.subheader("📈 Evolução dos Indicadores - Operação")
+    
+    df_historico_completo = carregar_historico(supabase)
+    
+    if df_historico_completo is not None and not df_historico_completo.empty:
+        df_mensal = df_historico_completo.groupby('mes_ano').agg({
+            'csat': 'mean',
+            'perc_avaliacoes': 'mean',
+            'perc_envio': 'mean'
+        }).reset_index()
+        
+        fig_csat = criar_grafico_evolucao(
+            df_mensal, 
+            'csat', 
+            'CSAT Médio - Operação', 
+            '#2ecc71',
+            meta=meta_csat,
+            meta_label=f'Meta: {meta_csat}%'
+        )
+        if fig_csat:
+            st.plotly_chart(fig_csat, use_container_width=True)
+        
+        fig_avaliacoes = criar_grafico_evolucao(
+            df_mensal, 
+            'perc_avaliacoes', 
+            '% Avaliações Médio - Operação', 
+            '#3498db',
+            meta=meta_avaliacoes,
+            meta_label=f'Meta: {meta_avaliacoes}%'
+        )
+        if fig_avaliacoes:
+            st.plotly_chart(fig_avaliacoes, use_container_width=True)
+        
+        fig_envio = criar_grafico_evolucao(
+            df_mensal, 
+            'perc_envio', 
+            '% Envio Médio - Operação', 
+            '#f39c12',
+            meta=meta_envio,
+            meta_label=f'Meta: {meta_envio}%'
+        )
+        if fig_envio:
+            st.plotly_chart(fig_envio, use_container_width=True)
+    else:
+        st.info("Dados insuficientes para gráficos de evolução. Importe mais meses.")
+    
+    st.markdown("---")
+    
+    # ===== RANKING GERAL =====
     col1, col2 = st.columns(2)
     
     with col1:
@@ -904,25 +1213,7 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     
     st.markdown("---")
     
-    # Gráficos
-    st.subheader("📊 Análise da Operação")
-    df_dashboard = pd.DataFrame([
-        {
-            'Analista': nome,
-            'Gestor': dados['gestor'],
-            'CSAT': dados['csat'],
-            '% Avaliações': dados['perc_avaliacoes'],
-            '% Envio': dados['perc_envio'],
-            '💬 Atendimentos': dados['total_atendimentos'],
-            'Status': dados['status']
-        }
-        for nome, dados in resultados.items()
-    ])
-    
-    if not df_dashboard.empty:
-        criar_graficos_dashboard_coordenador(df_dashboard)
-    
-    # Tabela
+    # ===== TABELA DE DESEMPENHO =====
     st.subheader("📋 Desempenho da Operação")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
@@ -942,139 +1233,7 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
 
 # ============================================
-# FUNÇÕES DE VISUALIZAÇÃO
-# ============================================
-
-def criar_graficos_dashboard(df_dashboard):
-    if df_dashboard.empty:
-        st.warning("Nenhum dado disponível para gráficos.")
-        return
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        fig_csat = px.bar(
-            df_dashboard,
-            x='Analista',
-            y='CSAT',
-            color='CSAT',
-            color_continuous_scale=['red', 'yellow', 'green'],
-            range_color=[0, 100],
-            title='📊 CSAT por Analista',
-            text=df_dashboard['CSAT'].apply(lambda x: f'{x:.1f}%')
-        )
-        fig_csat.update_traces(textposition='outside')
-        fig_csat.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig_csat, use_container_width=True)
-    
-    with col2:
-        fig_avaliacoes = px.bar(
-            df_dashboard,
-            x='Analista',
-            y='% Avaliações',
-            color='% Avaliações',
-            color_continuous_scale=['red', 'yellow', 'green'],
-            range_color=[0, 50],
-            title='📈 % Avaliações por Analista',
-            text=df_dashboard['% Avaliações'].apply(lambda x: f'{x:.1f}%')
-        )
-        fig_avaliacoes.update_traces(textposition='outside')
-        fig_avaliacoes.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig_avaliacoes, use_container_width=True)
-    
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        fig_envio = px.bar(
-            df_dashboard,
-            x='Analista',
-            y='% Envio',
-            color='% Envio',
-            color_continuous_scale=['green', 'yellow', 'red'],
-            range_color=[0, 100],
-            title='📤 % Envio por Analista',
-            text=df_dashboard['% Envio'].apply(lambda x: f'{x:.1f}%')
-        )
-        fig_envio.update_traces(textposition='outside')
-        fig_envio.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig_envio, use_container_width=True)
-    
-    with col4:
-        fig_scatter = px.scatter(
-            df_dashboard,
-            x='💬 Atendimentos',
-            y='CSAT',
-            size='💬 Atendimentos',
-            color='Status',
-            hover_data=['Analista', '% Avaliações', '% Envio'],
-            title='🎯 CSAT vs 💬 Atendimentos',
-            labels={'💬 Atendimentos': '💬 Quantidade de Atendimentos', 'CSAT': 'CSAT (%)'}
-        )
-        fig_scatter.update_layout(height=400)
-        st.plotly_chart(fig_scatter, use_container_width=True)
-
-def criar_graficos_dashboard_coordenador(df_dashboard):
-    if df_dashboard.empty:
-        st.warning("Nenhum dado disponível para gráficos.")
-        return
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        df_gestor = df_dashboard.groupby('Gestor').agg({
-            'CSAT': 'mean',
-            'Analista': 'count'
-        }).reset_index()
-        df_gestor.columns = ['Gestor', 'CSAT Médio', 'Quantidade']
-        
-        fig_gestor = px.bar(
-            df_gestor,
-            x='Gestor',
-            y='CSAT Médio',
-            color='CSAT Médio',
-            color_continuous_scale=['red', 'yellow', 'green'],
-            range_color=[0, 100],
-            title='📊 CSAT Médio por Gestor',
-            text=df_gestor['CSAT Médio'].apply(lambda x: f'{x:.1f}%')
-        )
-        fig_gestor.update_traces(textposition='outside')
-        fig_gestor.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig_gestor, use_container_width=True)
-    
-    with col2:
-        df_gestor_avaliacoes = df_dashboard.groupby('Gestor').agg({
-            '% Avaliações': 'mean'
-        }).reset_index()
-        
-        fig_gestor_avaliacoes = px.bar(
-            df_gestor_avaliacoes,
-            x='Gestor',
-            y='% Avaliações',
-            color='% Avaliações',
-            color_continuous_scale=['red', 'yellow', 'green'],
-            range_color=[0, 50],
-            title='📈 % Avaliações Médio por Gestor',
-            text=df_gestor_avaliacoes['% Avaliações'].apply(lambda x: f'{x:.1f}%')
-        )
-        fig_gestor_avaliacoes.update_traces(textposition='outside')
-        fig_gestor_avaliacoes.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig_gestor_avaliacoes, use_container_width=True)
-    
-    fig_scatter_gestor = px.scatter(
-        df_dashboard,
-        x='💬 Atendimentos',
-        y='CSAT',
-        size='💬 Atendimentos',
-        color='Gestor',
-        hover_data=['Analista', '% Avaliações', '% Envio'],
-        title='🎯 CSAT vs 💬 Atendimentos por Gestor',
-        labels={'💬 Atendimentos': '💬 Quantidade de Atendimentos', 'CSAT': 'CSAT (%)'}
-    )
-    fig_scatter_gestor.update_layout(height=400)
-    st.plotly_chart(fig_scatter_gestor, use_container_width=True)
-
-# ============================================
-# FUNÇÕES DE RELATÓRIOS
+# FUNÇÕES DE RELATÓRIOS (MANTIDAS)
 # ============================================
 
 def gerar_analise_tecnica(analista, dados, media_operacao, podio):
@@ -1431,22 +1590,6 @@ def gerenciar_analistas_completo(analistas_config):
 # ============================================
 # FUNÇÕES DE PAINEL E GRÁFICO MENSAL
 # ============================================
-
-def ordenar_meses(meses):
-    ordem_meses = {
-        'January': 1, 'February': 2, 'March': 3, 'April': 4,
-        'May': 5, 'June': 6, 'July': 7, 'August': 8,
-        'September': 9, 'October': 10, 'November': 11, 'December': 12,
-        'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
-        'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
-        'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
-    }
-    
-    def get_ordem(mes):
-        nome_mes = mes.split()[0] if mes else mes
-        return ordem_meses.get(nome_mes, 13)
-    
-    return sorted(meses, key=get_ordem)
 
 def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     if dados_mensais is None or dados_mensais.empty:
@@ -2272,7 +2415,7 @@ def main():
     st.markdown(
         """
         <div style="text-align: center; color: #666; font-size: 12px;">
-            Sistema de Performance v10.0 | UX Melhorado + Perfil Coordenador/Gestor + Isolamento por Gestor + Seletor de Período
+            Sistema de Performance v11.0 | UX Melhorado + Dashboard Visual + Evolução de Indicadores
         </div>
         """,
         unsafe_allow_html=True
