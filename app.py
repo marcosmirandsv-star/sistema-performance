@@ -718,9 +718,18 @@ def dashboard_gestor(resultados, periodo, gestor_nome, supabase=None):
         st.info("📊 Nenhum dado disponível para sua equipe.")
         return
     
+    # ===== FILTRAR APENAS ANALISTAS DO GESTOR =====
+    if not st.session_state.get('acesso_total', False):
+        resultados_filtrados = {k: v for k, v in resultados.items() if v.get('gestor') == gestor_nome}
+        if not resultados_filtrados:
+            st.warning(f"⚠️ Nenhum analista encontrado para o gestor: {gestor_nome}")
+            return
+    else:
+        resultados_filtrados = resultados
+    
     # ===== SELETOR DE PERÍODO =====
     if supabase:
-        periodos_disponiveis = listar_periodos(supabase, gestor_nome)
+        periodos_disponiveis = listar_periodos(supabase, gestor_nome if not st.session_state.get('acesso_total', False) else None)
         if periodos_disponiveis and len(periodos_disponiveis) > 1:
             periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
             periodo_selecionado = st.selectbox(
@@ -730,8 +739,7 @@ def dashboard_gestor(resultados, periodo, gestor_nome, supabase=None):
                 key="seletor_periodo_gestor"
             )
             if periodo_selecionado != periodo:
-                # Recarregar dados do período selecionado
-                df_historico = carregar_historico(supabase, mes_ano=periodo_selecionado, gestor=gestor_nome)
+                df_historico = carregar_historico(supabase, mes_ano=periodo_selecionado, gestor=gestor_nome if not st.session_state.get('acesso_total', False) else None)
                 if df_historico is not None and not df_historico.empty:
                     resultados_temp = {}
                     for _, row in df_historico.iterrows():
@@ -751,17 +759,17 @@ def dashboard_gestor(resultados, periodo, gestor_nome, supabase=None):
                             'status': row['status'],
                             'gestor': row['gestor']
                         }
-                    resultados = resultados_temp
-                    st.session_state.resultados = resultados
+                    resultados_filtrados = resultados_temp
+                    st.session_state.resultados = resultados_filtrados
                     st.session_state.periodo = periodo_selecionado
                     st.rerun()
     
     # Métricas da equipe
-    total_analistas = len(resultados)
-    total_atendimentos = sum([d['total_atendimentos'] for d in resultados.values()])
+    total_analistas = len(resultados_filtrados)
+    total_atendimentos = sum([d['total_atendimentos'] for d in resultados_filtrados.values()])
     media_atendimentos = total_atendimentos / total_analistas if total_analistas > 0 else 0
-    csat_medio = sum([d['csat'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
-    metas_superadas = len([d for d in resultados.values() if d['status'] == '🟢 Meta Superada'])
+    csat_medio = sum([d['csat'] for d in resultados_filtrados.values()]) / total_analistas if total_analistas > 0 else 0
+    metas_superadas = len([d for d in resultados_filtrados.values() if d['status'] == '🟢 Meta Superada'])
     
     st.subheader(f"📊 Dashboard da Equipe - {gestor_nome}")
     
@@ -785,24 +793,30 @@ def dashboard_gestor(resultados, periodo, gestor_nome, supabase=None):
     
     with col1:
         st.subheader("🏆 Top Performers da Equipe")
-        top_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True)[:3]
-        for i, (nome, dados) in enumerate(top_analistas, 1):
-            medalha = ["🥇", "🥈", "🥉"][i-1]
-            st.markdown(f"""
-            <div style="background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 5px;">
-                <b>{medalha} {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
-            </div>
-            """, unsafe_allow_html=True)
+        top_analistas = sorted(resultados_filtrados.items(), key=lambda x: x[1]['csat'], reverse=True)[:3]
+        if top_analistas:
+            for i, (nome, dados) in enumerate(top_analistas, 1):
+                medalha = ["🥇", "🥈", "🥉"][i-1]
+                st.markdown(f"""
+                <div style="background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 5px;">
+                    <b>{medalha} {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Nenhum analista encontrado.")
     
     with col2:
         st.subheader("📊 Oportunidades de Melhoria")
-        bottom_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'])[:3]
-        for i, (nome, dados) in enumerate(bottom_analistas, 1):
-            st.markdown(f"""
-            <div style="background: #fff5f5; padding: 10px; border-radius: 8px; margin-bottom: 5px;">
-                <b>{i}º {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
-            </div>
-            """, unsafe_allow_html=True)
+        bottom_analistas = sorted(resultados_filtrados.items(), key=lambda x: x[1]['csat'])[:3]
+        if bottom_analistas:
+            for i, (nome, dados) in enumerate(bottom_analistas, 1):
+                st.markdown(f"""
+                <div style="background: #fff5f5; padding: 10px; border-radius: 8px; margin-bottom: 5px;">
+                    <b>{i}º {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Nenhum analista encontrado.")
     
     st.markdown("---")
     
@@ -817,7 +831,7 @@ def dashboard_gestor(resultados, periodo, gestor_nome, supabase=None):
             '💬 Atendimentos': dados['total_atendimentos'],
             'Status': dados['status']
         }
-        for nome, dados in resultados.items()
+        for nome, dados in resultados_filtrados.items()
     ])
     
     if not df_dashboard.empty:
@@ -826,7 +840,7 @@ def dashboard_gestor(resultados, periodo, gestor_nome, supabase=None):
     # Tabela de Desempenho da equipe
     st.subheader("📋 Desempenho da Equipe")
     dados_tabela = []
-    for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
+    for analista, dados in sorted(resultados_filtrados.items(), key=lambda x: x[1]['csat'], reverse=True):
         dados_tabela.append({
             'Analista': analista,
             'CSAT': f"{dados['csat']:.2f}%",
@@ -2158,7 +2172,6 @@ def main():
                 if supabase:
                     df_historico = carregar_historico(supabase, gestor=gestor_ativo)
                     if df_historico is not None and not df_historico.empty:
-                        # Encontrar o período mais recente
                         periodos = sorted(df_historico['mes_ano'].unique().tolist(), reverse=True)
                         if periodos:
                             periodo_mais_recente = periodos[0]
@@ -2400,14 +2413,12 @@ def main():
             st.info(f"📊 Bem-vindo, Gestor! Faça upload dos arquivos para sua equipe: {gestor_ativo}")
         
         if supabase:
-            # Carregar o último período automaticamente
             if acesso_total:
                 periodos = listar_periodos(supabase)
             else:
                 periodos = listar_periodos(supabase, gestor_ativo)
             
             if periodos:
-                # Encontrar o período mais recente
                 periodos_ordenados = sorted(periodos, key=lambda x: x['mes_ano'], reverse=True)
                 ultimo_periodo = periodos_ordenados[0]
                 st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
