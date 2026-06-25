@@ -660,7 +660,6 @@ def processar_dados(df_satisfacao, df_inativos, analistas_config):
     return resultados
 
 def calcular_media_operacao(resultados):
-    """Calcula a média de atendimentos por agente (apenas para os dados filtrados)"""
     if not resultados:
         return 0
     total_atendimentos = sum([d['total_atendimentos'] for d in resultados.values()])
@@ -668,12 +667,6 @@ def calcular_media_operacao(resultados):
     return round(total_atendimentos / total_analistas) if total_analistas > 0 else 0
 
 def calcular_podio(resultados, media_atendimentos=None, limiar_csat=90):
-    """
-    Calcula o pódio baseado em:
-    - CSAT ≥ 90%
-    - Atendimentos ≥ média
-    - % Avaliações ≥ 25%
-    """
     if not resultados:
         return []
     
@@ -697,39 +690,71 @@ def calcular_podio(resultados, media_atendimentos=None, limiar_csat=90):
 # ============================================
 
 def filtrar_por_gestor(resultados, gestor):
-    """Filtra resultados pelo gestor especificado"""
     if not resultados:
         return {}
     
-    # Se acesso total, retorna todos
     if st.session_state.get('acesso_total', False):
         return resultados
     
-    # Filtra apenas os analistas do gestor atual
     return {k: v for k, v in resultados.items() if v.get('gestor') == gestor}
 
 def obter_gestor_ativo():
-    """Retorna o gestor ativo da sessão"""
     return st.session_state.get('gestor', None)
 
 def is_acesso_total():
-    """Verifica se o usuário tem acesso total"""
     return st.session_state.get('acesso_total', False)
 
 def obter_perfil_usuario():
-    """Retorna o perfil do usuário (Coordenador ou Gestor)"""
     return st.session_state.get('perfil', 'Gestor')
 
 # ============================================
 # DASHBOARD RESUMO - GESTOR
 # ============================================
 
-def dashboard_gestor(resultados, periodo, gestor_nome):
+def dashboard_gestor(resultados, periodo, gestor_nome, supabase=None):
     """Dashboard específica para Gestor - mostra apenas sua equipe"""
     
     if not resultados:
         st.info("📊 Nenhum dado disponível para sua equipe.")
         return
+    
+    # ===== SELETOR DE PERÍODO =====
+    if supabase:
+        periodos_disponiveis = listar_periodos(supabase, gestor_nome)
+        if periodos_disponiveis and len(periodos_disponiveis) > 1:
+            periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
+            periodo_selecionado = st.selectbox(
+                "📅 Selecione o Período",
+                periodos_lista,
+                index=0 if periodo in periodos_lista else 0,
+                key="seletor_periodo_gestor"
+            )
+            if periodo_selecionado != periodo:
+                # Recarregar dados do período selecionado
+                df_historico = carregar_historico(supabase, mes_ano=periodo_selecionado, gestor=gestor_nome)
+                if df_historico is not None and not df_historico.empty:
+                    resultados_temp = {}
+                    for _, row in df_historico.iterrows():
+                        resultados_temp[row['analista']] = {
+                            'total_atendimentos': row['total_atendimentos'],
+                            'total_inativos': row['total_inativos'],
+                            'validos': row['validos'],
+                            'avaliacoes': row['avaliacoes'],
+                            'positivos': row['positivos'],
+                            'negativos': row['negativos'],
+                            'perc_avaliacoes': row['perc_avaliacoes'],
+                            'perc_envio': row['perc_envio'],
+                            'csat': row['csat'],
+                            'meta_csat': row['meta_csat'],
+                            'delta_csat': row['delta_csat'],
+                            'meta_geral': row['meta_geral'],
+                            'status': row['status'],
+                            'gestor': row['gestor']
+                        }
+                    resultados = resultados_temp
+                    st.session_state.resultados = resultados
+                    st.session_state.periodo = periodo_selecionado
+                    st.rerun()
     
     # Métricas da equipe
     total_analistas = len(resultados)
@@ -820,12 +845,49 @@ def dashboard_gestor(resultados, periodo, gestor_nome):
 # DASHBOARD RESUMO - COORDENADOR
 # ============================================
 
-def dashboard_coordenador(resultados, periodo, nome_usuario):
+def dashboard_coordenador(resultados, periodo, nome_usuario, supabase=None):
     """Dashboard específica para Coordenador - visão consolidada de todos os gestores"""
     
     if not resultados:
         st.info("📊 Nenhum dado disponível para a operação.")
         return
+    
+    # ===== SELETOR DE PERÍODO =====
+    if supabase:
+        periodos_disponiveis = listar_periodos(supabase)
+        if periodos_disponiveis and len(periodos_disponiveis) > 1:
+            periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
+            periodo_selecionado = st.selectbox(
+                "📅 Selecione o Período",
+                periodos_lista,
+                index=0 if periodo in periodos_lista else 0,
+                key="seletor_periodo_coordenador"
+            )
+            if periodo_selecionado != periodo:
+                df_historico = carregar_historico(supabase, mes_ano=periodo_selecionado)
+                if df_historico is not None and not df_historico.empty:
+                    resultados_temp = {}
+                    for _, row in df_historico.iterrows():
+                        resultados_temp[row['analista']] = {
+                            'total_atendimentos': row['total_atendimentos'],
+                            'total_inativos': row['total_inativos'],
+                            'validos': row['validos'],
+                            'avaliacoes': row['avaliacoes'],
+                            'positivos': row['positivos'],
+                            'negativos': row['negativos'],
+                            'perc_avaliacoes': row['perc_avaliacoes'],
+                            'perc_envio': row['perc_envio'],
+                            'csat': row['csat'],
+                            'meta_csat': row['meta_csat'],
+                            'delta_csat': row['delta_csat'],
+                            'meta_geral': row['meta_geral'],
+                            'status': row['status'],
+                            'gestor': row['gestor']
+                        }
+                    resultados = resultados_temp
+                    st.session_state.resultados = resultados
+                    st.session_state.periodo = periodo_selecionado
+                    st.rerun()
     
     # Métricas Gerais da Operação
     total_analistas = len(resultados)
@@ -854,7 +916,6 @@ def dashboard_coordenador(resultados, periodo, nome_usuario):
     # Ranking Geral da Operação
     st.subheader("🏆 Ranking Geral da Operação")
     
-    # Top e Bottom Performers da operação
     col1, col2 = st.columns(2)
     
     with col1:
@@ -922,7 +983,6 @@ def dashboard_coordenador(resultados, periodo, nome_usuario):
 # ============================================
 
 def criar_graficos_dashboard(df_dashboard):
-    """Gráficos para Dashboard do Gestor"""
     if df_dashboard.empty:
         st.warning("Nenhum dado disponível para gráficos.")
         return
@@ -1067,16 +1127,13 @@ def criar_graficos_dashboard(df_dashboard):
         st.dataframe(status_detalhe, use_container_width=True, hide_index=True)
 
 def criar_graficos_dashboard_coordenador(df_dashboard):
-    """Gráficos para Dashboard do Coordenador - com visão por Gestor"""
     if df_dashboard.empty:
         st.warning("Nenhum dado disponível para gráficos.")
         return
     
-    # Gráfico de CSAT por Gestor
     col1, col2 = st.columns(2)
     
     with col1:
-        # CSAT médio por gestor
         df_gestor = df_dashboard.groupby('Gestor').agg({
             'CSAT': 'mean',
             'Analista': 'count'
@@ -1098,7 +1155,6 @@ def criar_graficos_dashboard_coordenador(df_dashboard):
         st.plotly_chart(fig_gestor, use_container_width=True)
     
     with col2:
-        # % Avaliações médio por gestor
         df_gestor_avaliacoes = df_dashboard.groupby('Gestor').agg({
             '% Avaliações': 'mean'
         }).reset_index()
@@ -1117,7 +1173,6 @@ def criar_graficos_dashboard_coordenador(df_dashboard):
         fig_gestor_avaliacoes.update_layout(height=400, showlegend=False)
         st.plotly_chart(fig_gestor_avaliacoes, use_container_width=True)
     
-    # Gráfico de dispersão por gestor
     fig_scatter_gestor = px.scatter(
         df_dashboard,
         x='💬 Atendimentos',
@@ -1131,7 +1186,6 @@ def criar_graficos_dashboard_coordenador(df_dashboard):
     fig_scatter_gestor.update_layout(height=400)
     st.plotly_chart(fig_scatter_gestor, use_container_width=True)
     
-    # Distribuição de Status por Gestor
     st.subheader("📊 Distribuição de Status por Gestor")
     
     status_gestor = df_dashboard.groupby(['Gestor', 'Status']).agg({
@@ -1154,7 +1208,6 @@ def criar_graficos_dashboard_coordenador(df_dashboard):
     fig_status_gestor.update_layout(height=400)
     st.plotly_chart(fig_status_gestor, use_container_width=True)
     
-    # Tabela resumo por gestor
     st.subheader("📋 Resumo por Gestor")
     resumo_gestor = df_dashboard.groupby('Gestor').agg({
         'Analista': 'count',
@@ -1529,7 +1582,6 @@ Gere o feedback:
 # ============================================
 
 def ordenar_meses(meses):
-    """Ordena meses na ordem correta: Janeiro → Dezembro"""
     ordem_meses = {
         'January': 1, 'February': 2, 'March': 3, 'April': 4,
         'May': 5, 'June': 6, 'July': 7, 'August': 8,
@@ -1557,7 +1609,6 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     if meses < 2:
         return None
     
-    # Ordenar por mês/ano corretamente
     df_analista = df_analista.sort_values('mes_ano')
     meses_ordenados = ordenar_meses(df_analista['mes_ano'].unique().tolist())
     df_analista['mes_ano_ordem'] = df_analista['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
@@ -1863,7 +1914,6 @@ def main():
                         
                         st.session_state.periodo = periodo
                         
-                        # Usar o gestor da sessão para salvar
                         gestor_salvar = st.session_state.get('gestor', 'Marcos Miranda - Chat Notas')
                         
                         if supabase:
@@ -1929,7 +1979,6 @@ def main():
     if st.session_state.get('mostrar_periodos', False):
         st.header("📂 Gerenciar Períodos Importados")
         if supabase:
-            # Filtrar períodos pelo gestor atual (a menos que tenha acesso total)
             if acesso_total:
                 periodos = listar_periodos(supabase)
             else:
@@ -1989,7 +2038,6 @@ def main():
         st.header("📊 Consultar Histórico")
         
         if supabase:
-            # Carregar histórico com filtro de gestor
             if acesso_total:
                 df_historico = carregar_historico(supabase)
             else:
@@ -2026,7 +2074,6 @@ def main():
                 if analista_filtro != 'Todos':
                     df_filtrado = df_filtrado[df_filtrado['analista'] == analista_filtro]
                 
-                # Métricas
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.metric("Total Registros", len(df_filtrado))
@@ -2040,7 +2087,6 @@ def main():
                 st.markdown("---")
                 
                 if not df_filtrado.empty:
-                    # Gráfico de evolução mensal com ordem correta
                     df_agrupado = df_filtrado.groupby('mes_ano').agg({
                         'csat': 'mean',
                         'perc_avaliacoes': 'mean',
@@ -2102,53 +2148,56 @@ def main():
             # COORDENADOR - Visualiza todos os dados
             resultados_filtrados = resultados
             st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
-            dashboard_coordenador(resultados_filtrados, periodo, nome_usuario)
+            dashboard_coordenador(resultados_filtrados, periodo, nome_usuario, supabase)
         else:
             # GESTOR - Visualiza apenas sua equipe
             resultados_filtrados = {k: v for k, v in resultados.items() if v.get('gestor') == gestor_ativo}
             
             if not resultados_filtrados:
                 st.warning(f"⚠️ Nenhum dado encontrado para sua equipe: {gestor_ativo}")
-                # Tentar carregar do histórico
                 if supabase:
                     df_historico = carregar_historico(supabase, gestor=gestor_ativo)
                     if df_historico is not None and not df_historico.empty:
-                        resultados_temp = {}
-                        for _, row in df_historico.iterrows():
-                            resultados_temp[row['analista']] = {
-                                'total_atendimentos': row['total_atendimentos'],
-                                'total_inativos': row['total_inativos'],
-                                'validos': row['validos'],
-                                'avaliacoes': row['avaliacoes'],
-                                'positivos': row['positivos'],
-                                'negativos': row['negativos'],
-                                'perc_avaliacoes': row['perc_avaliacoes'],
-                                'perc_envio': row['perc_envio'],
-                                'csat': row['csat'],
-                                'meta_csat': row['meta_csat'],
-                                'delta_csat': row['delta_csat'],
-                                'meta_geral': row['meta_geral'],
-                                'status': row['status'],
-                                'gestor': row['gestor']
-                            }
-                        resultados_filtrados = resultados_temp
-                        st.session_state.resultados = resultados_filtrados
-                        st.rerun()
+                        # Encontrar o período mais recente
+                        periodos = sorted(df_historico['mes_ano'].unique().tolist(), reverse=True)
+                        if periodos:
+                            periodo_mais_recente = periodos[0]
+                            df_historico_filtrado = df_historico[df_historico['mes_ano'] == periodo_mais_recente]
+                            resultados_temp = {}
+                            for _, row in df_historico_filtrado.iterrows():
+                                resultados_temp[row['analista']] = {
+                                    'total_atendimentos': row['total_atendimentos'],
+                                    'total_inativos': row['total_inativos'],
+                                    'validos': row['validos'],
+                                    'avaliacoes': row['avaliacoes'],
+                                    'positivos': row['positivos'],
+                                    'negativos': row['negativos'],
+                                    'perc_avaliacoes': row['perc_avaliacoes'],
+                                    'perc_envio': row['perc_envio'],
+                                    'csat': row['csat'],
+                                    'meta_csat': row['meta_csat'],
+                                    'delta_csat': row['delta_csat'],
+                                    'meta_geral': row['meta_geral'],
+                                    'status': row['status'],
+                                    'gestor': row['gestor']
+                                }
+                            resultados_filtrados = resultados_temp
+                            st.session_state.resultados = resultados_filtrados
+                            st.session_state.periodo = periodo_mais_recente
+                            st.rerun()
                 return
             
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
-            dashboard_gestor(resultados_filtrados, periodo, gestor_ativo)
+            dashboard_gestor(resultados_filtrados, periodo, gestor_ativo, supabase)
         
         st.markdown("---")
         
         # ===== PÓDIO =====
         st.subheader("🏆 Pódio do Mês")
         
-        # Calcular média e pódio apenas com os dados filtrados
         media_atendimentos = calcular_media_operacao(resultados_filtrados)
         podio = calcular_podio(resultados_filtrados, media_atendimentos)
         
-        # Carregar pódio manual (apenas do gestor atual, se for gestor)
         if supabase and not acesso_total:
             try:
                 podio_manual = carregar_podio_manual(supabase, periodo, gestor_ativo)
@@ -2228,18 +2277,14 @@ def main():
         # ===== RELATÓRIO INDIVIDUAL =====
         st.subheader("📄 Gerar Relatório Individual")
         
-        # Apenas analistas do gestor atual aparecem na lista (ou todos se coordenador)
         analista_selecionado = st.selectbox("Selecione o Analista", list(resultados_filtrados.keys()))
         
         if analista_selecionado:
             dados = resultados_filtrados[analista_selecionado]
             
-            # ===== 1. PAINEL VISUAL =====
             posicao_podio = criar_painel_analista(analista_selecionado, dados, media_atendimentos, podio)
             
-            # ===== 2. GRÁFICO DE EVOLUÇÃO =====
             if supabase:
-                # Carregar histórico apenas do gestor atual (ou todos se coordenador)
                 if acesso_total:
                     df_historico_analista = carregar_historico(supabase, analista=analista_selecionado)
                 else:
@@ -2250,12 +2295,10 @@ def main():
                     st.plotly_chart(fig_mensal, use_container_width=True)
                     st.markdown("---")
             
-            # ===== 3. ANÁLISE TÉCNICA =====
             with st.expander("📊 Análise Técnica", expanded=True):
                 analise_tecnica = gerar_analise_tecnica(analista_selecionado, dados, media_atendimentos, podio)
                 st.markdown(analise_tecnica)
             
-            # ===== 4. FEEDBACK =====
             with st.expander("📝 Feedback de Performance", expanded=True):
                 st.subheader(f"📝 Feedback - {analista_selecionado}")
                 feedback_atual = gerar_feedback_manual(analista_selecionado, dados, media_atendimentos, posicao_podio)
@@ -2299,7 +2342,6 @@ def main():
                 else:
                     feedback = feedback_editado
             
-            # ===== 5. RELATÓRIO COMPLETO =====
             with st.expander("📄 Relatório Completo", expanded=False):
                 relatorio_markdown = f"""
 # {analista_selecionado}
@@ -2333,7 +2375,6 @@ def main():
 """
                 st.markdown(relatorio_markdown)
             
-            # ===== BOTÕES DE DOWNLOAD =====
             col1, col2 = st.columns(2)
             with col1:
                 st.download_button(
@@ -2358,21 +2399,19 @@ def main():
         else:
             st.info(f"📊 Bem-vindo, Gestor! Faça upload dos arquivos para sua equipe: {gestor_ativo}")
         
-        # ===== CARREGAR ÚLTIMO PERÍODO AUTOMATICAMENTE =====
         if supabase:
-            # Carregar períodos do gestor atual (ou todos se coordenador)
+            # Carregar o último período automaticamente
             if acesso_total:
                 periodos = listar_periodos(supabase)
             else:
                 periodos = listar_periodos(supabase, gestor_ativo)
             
             if periodos:
-                # Ordenar períodos por data (mais recente primeiro)
+                # Encontrar o período mais recente
                 periodos_ordenados = sorted(periodos, key=lambda x: x['mes_ano'], reverse=True)
                 ultimo_periodo = periodos_ordenados[0]
                 st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
                 
-                # Carregar dados do último período
                 df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo['mes_ano'], gestor=ultimo_periodo['gestor'])
                 if df_historico is not None and not df_historico.empty:
                     resultados = {}
@@ -2402,7 +2441,7 @@ def main():
     st.markdown(
         """
         <div style="text-align: center; color: #666; font-size: 12px;">
-            Sistema de Performance v10.0 | UX Melhorado + Perfil Coordenador/Gestor + Isolamento por Gestor
+            Sistema de Performance v10.0 | UX Melhorado + Perfil Coordenador/Gestor + Isolamento por Gestor + Seletor de Período
         </div>
         """,
         unsafe_allow_html=True
