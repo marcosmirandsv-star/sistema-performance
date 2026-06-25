@@ -50,111 +50,139 @@ def init_supabase():
         return None
 
 # ============================================
+# FUNÇÕES DE CRIAÇÃO DE TABELAS
+# ============================================
+
+def criar_tabelas_supabase():
+    """Cria as tabelas necessárias no Supabase se não existirem"""
+    supabase = init_supabase()
+    if not supabase:
+        return False
+    
+    try:
+        # Verifica se a tabela usuarios existe
+        try:
+            supabase.table('usuarios').select('*').limit(1).execute()
+            st.success("✅ Tabela 'usuarios' já existe")
+        except Exception as e:
+            if 'PGRST205' in str(e) or 'Could not find the table' in str(e):
+                st.warning("⚠️ Tabela 'usuarios' não encontrada. Criando...")
+                # A tabela precisa ser criada manualmente no SQL Editor do Supabase
+                # Vamos usar uma abordagem alternativa: salvar usuários localmente
+                return False
+        return True
+    except Exception as e:
+        st.error(f"❌ Erro ao verificar tabelas: {str(e)}")
+        return False
+
+# ============================================
 # FUNÇÕES DE RESET E DIAGNÓSTICO
 # ============================================
 
 def resetar_usuario_carine():
-    """Função para resetar o usuário Carine no Supabase"""
-    supabase = init_supabase()
-    if supabase:
-        try:
-            # Remove usuário existente
-            supabase.table('usuarios').delete().eq('usuario', 'carine').execute()
-            
-            # Recria com senha padrão
-            supabase.table('usuarios').insert({
-                'usuario': 'carine',
-                'nome': 'Carine Melo',
-                'senha': hash_senha('carine2026'),
-                'gestor': GESTOR_MARCOS,
-                'acesso_total': True
-            }).execute()
-            
-            st.success("✅ Usuário Carine resetado com sucesso!")
-            return True
-        except Exception as e:
-            st.error(f"❌ Erro ao resetar: {str(e)}")
-            return False
-    return False
+    """Função para resetar o usuário Carine - versão local"""
+    try:
+        # Carrega usuários atuais
+        usuarios = carregar_usuarios()
+        
+        # Garante que Carine está no arquivo local
+        usuarios['carine'] = {
+            'senha': hash_senha('carine2026'),
+            'nome': 'Carine Melo',
+            'gestor': GESTOR_MARCOS,
+            'acesso_total': True
+        }
+        
+        # Salva no arquivo local
+        with open('usuarios.json', 'w', encoding='utf-8') as f:
+            json.dump(usuarios, f, ensure_ascii=False, indent=2)
+        
+        st.success("✅ Usuário Carine resetado com sucesso no arquivo local!")
+        return True
+    except Exception as e:
+        st.error(f"❌ Erro ao resetar: {str(e)}")
+        return False
 
 def adicionar_dados_teste_polyana():
     """Função para adicionar dados de teste para a Polyana"""
     supabase = init_supabase()
-    if supabase:
-        try:
-            # Verifica se já existem dados
-            existing = supabase.table('historico_performance').select('*').eq('gestor', GESTOR_POLYANA).eq('mes_ano', 'Maio 2026').execute()
-            if existing.data:
-                st.info("ℹ️ Dados para Polyana já existem.")
-                return True
-            
-            # Dados de exemplo para Polyana
-            dados_teste = [
-                {
-                    'mes_ano': 'Maio 2026',
-                    'analista': 'Christian Matozinho',
-                    'gestor': GESTOR_POLYANA,
-                    'csat': 88.5,
-                    'perc_avaliacoes': 26.3,
-                    'perc_envio': 73.7,
-                    'total_atendimentos': 145,
-                    'total_inativos': 5,
-                    'validos': 140,
-                    'avaliacoes': 37,
-                    'positivos': 33,
-                    'negativos': 4,
-                    'meta_csat': 86,
-                    'delta_csat': 2.5,
-                    'meta_geral': 25,
-                    'status': '🟢 Meta Superada'
-                },
-                {
-                    'mes_ano': 'Maio 2026',
-                    'analista': 'Diego Machado',
-                    'gestor': GESTOR_POLYANA,
-                    'csat': 85.2,
-                    'perc_avaliacoes': 22.1,
-                    'perc_envio': 77.9,
-                    'total_atendimentos': 138,
-                    'total_inativos': 8,
-                    'validos': 130,
-                    'avaliacoes': 29,
-                    'positivos': 25,
-                    'negativos': 4,
-                    'meta_csat': 86,
-                    'delta_csat': -0.8,
-                    'meta_geral': 25,
-                    'status': '🟡 Atenção'
-                },
-                {
-                    'mes_ano': 'Maio 2026',
-                    'analista': 'Igor Siqueira',
-                    'gestor': GESTOR_POLYANA,
-                    'csat': 92.1,
-                    'perc_avaliacoes': 28.7,
-                    'perc_envio': 71.3,
-                    'total_atendimentos': 152,
-                    'total_inativos': 3,
-                    'validos': 149,
-                    'avaliacoes': 43,
-                    'positivos': 40,
-                    'negativos': 3,
-                    'meta_csat': 86,
-                    'delta_csat': 6.1,
-                    'meta_geral': 25,
-                    'status': '🟢 Meta Superada'
-                }
-            ]
-            
-            for dado in dados_teste:
-                supabase.table('historico_performance').insert(dado).execute()
-            
-            st.success("✅ Dados de teste para Polyana adicionados com sucesso!")
+    if not supabase:
+        st.error("❌ Supabase não conectado")
+        return False
+    
+    try:
+        # Verifica se já existem dados
+        existing = supabase.table('historico_performance').select('*').eq('gestor', GESTOR_POLYANA).eq('mes_ano', 'Maio 2026').execute()
+        if existing.data:
+            st.info("ℹ️ Dados para Polyana já existem.")
             return True
-        except Exception as e:
-            st.error(f"❌ Erro ao adicionar dados: {str(e)}")
-            return False
-    return False
+        
+        # Dados de exemplo para Polyana
+        dados_teste = [
+            {
+                'mes_ano': 'Maio 2026',
+                'analista': 'Christian Matozinho',
+                'gestor': GESTOR_POLYANA,
+                'csat': 88.5,
+                'perc_avaliacoes': 26.3,
+                'perc_envio': 73.7,
+                'total_atendimentos': 145,
+                'total_inativos': 5,
+                'validos': 140,
+                'avaliacoes': 37,
+                'positivos': 33,
+                'negativos': 4,
+                'meta_csat': 86,
+                'delta_csat': 2.5,
+                'meta_geral': 25,
+                'status': '🟢 Meta Superada'
+            },
+            {
+                'mes_ano': 'Maio 2026',
+                'analista': 'Diego Machado',
+                'gestor': GESTOR_POLYANA,
+                'csat': 85.2,
+                'perc_avaliacoes': 22.1,
+                'perc_envio': 77.9,
+                'total_atendimentos': 138,
+                'total_inativos': 8,
+                'validos': 130,
+                'avaliacoes': 29,
+                'positivos': 25,
+                'negativos': 4,
+                'meta_csat': 86,
+                'delta_csat': -0.8,
+                'meta_geral': 25,
+                'status': '🟡 Atenção'
+            },
+            {
+                'mes_ano': 'Maio 2026',
+                'analista': 'Igor Siqueira',
+                'gestor': GESTOR_POLYANA,
+                'csat': 92.1,
+                'perc_avaliacoes': 28.7,
+                'perc_envio': 71.3,
+                'total_atendimentos': 152,
+                'total_inativos': 3,
+                'validos': 149,
+                'avaliacoes': 43,
+                'positivos': 40,
+                'negativos': 3,
+                'meta_csat': 86,
+                'delta_csat': 6.1,
+                'meta_geral': 25,
+                'status': '🟢 Meta Superada'
+            }
+        ]
+        
+        for dado in dados_teste:
+            supabase.table('historico_performance').insert(dado).execute()
+        
+        st.success("✅ Dados de teste para Polyana adicionados com sucesso!")
+        return True
+    except Exception as e:
+        st.error(f"❌ Erro ao adicionar dados: {str(e)}")
+        return False
 
 def diagnosticar_sistema():
     """Função de diagnóstico do sistema"""
@@ -165,14 +193,32 @@ def diagnosticar_sistema():
     
     st.subheader("🔍 Diagnóstico do Sistema")
     
-    # Verifica usuários
+    # Verifica tabelas
     try:
+        # Verifica tabela historico_performance
+        response = supabase.table('historico_performance').select('*').limit(1).execute()
+        st.success("✅ Tabela 'historico_performance' existe")
+    except Exception as e:
+        st.error(f"❌ Tabela 'historico_performance': {str(e)}")
+    
+    try:
+        # Verifica tabela usuarios
+        response = supabase.table('usuarios').select('*').limit(1).execute()
+        st.success("✅ Tabela 'usuarios' existe")
+        # Mostra usuários
         response = supabase.table('usuarios').select('*').execute()
         st.write("📋 Usuários cadastrados no Supabase:")
         for user in response.data:
             st.write(f"- **{user['usuario']}** ({user['nome']}) - Acesso Total: {user.get('acesso_total', False)}")
     except Exception as e:
-        st.error(f"Erro ao buscar usuários: {e}")
+        st.warning(f"⚠️ Tabela 'usuarios' não encontrada: {str(e)}")
+        st.info("💡 Os usuários estão sendo gerenciados pelo arquivo local 'usuarios.json'")
+    
+    # Verifica usuários locais
+    st.write("📋 Usuários no arquivo local:")
+    usuarios = carregar_usuarios()
+    for usuario, dados in usuarios.items():
+        st.write(f"- **{usuario}** ({dados['nome']}) - Gestor: {dados['gestor']}")
     
     # Verifica períodos
     try:
@@ -487,23 +533,8 @@ def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
 def carregar_usuarios():
-    """Carrega usuários com os nomes de gestor corretos"""
-    supabase = init_supabase()
-    if supabase:
-        try:
-            response = supabase.table('usuarios').select('*').execute()
-            usuarios = {}
-            for u in response.data:
-                usuarios[u['usuario']] = {
-                    'senha': u['senha'],
-                    'nome': u['nome'],
-                    'gestor': u['gestor'],
-                    'acesso_total': u.get('acesso_total', False)
-                }
-            return usuarios
-        except:
-            pass
-    
+    """Carrega usuários - prioriza o arquivo local já que a tabela do Supabase não existe"""
+    # Tenta carregar do arquivo local primeiro
     try:
         if os.path.exists('usuarios.json'):
             with open('usuarios.json', 'r', encoding='utf-8') as f:
@@ -511,6 +542,7 @@ def carregar_usuarios():
     except:
         pass
     
+    # Se não existir, cria o arquivo com os usuários padrão
     usuarios = {
         "marcos": {
             "senha": hash_senha("marcos2026"),
@@ -537,19 +569,14 @@ def carregar_usuarios():
             json.dump(usuarios, f, ensure_ascii=False, indent=2)
     except:
         pass
+    
     return usuarios
 
-def salvar_usuario_supabase(supabase, usuario, nome, senha_hash, gestor, acesso_total=False):
-    if not supabase:
-        return False
+def salvar_usuarios_local(usuarios):
+    """Salva usuários no arquivo local"""
     try:
-        supabase.table('usuarios').insert({
-            'usuario': usuario,
-            'nome': nome,
-            'senha': senha_hash,
-            'gestor': gestor,
-            'acesso_total': acesso_total
-        }).execute()
+        with open('usuarios.json', 'w', encoding='utf-8') as f:
+            json.dump(usuarios, f, ensure_ascii=False, indent=2)
         return True
     except:
         return False
@@ -628,8 +655,11 @@ def fazer_login():
     # ===== BOTÃO DE DIAGNÓSTICO =====
     with st.sidebar.expander("🔧 Ferramentas do Sistema", expanded=False):
         if st.button("🔄 Resetar Carine", use_container_width=True):
-            resetar_usuario_carine()
-            st.rerun()
+            if resetar_usuario_carine():
+                st.success("✅ Carine resetada! Use: carine / carine2026")
+                st.rerun()
+            else:
+                st.error("❌ Erro ao resetar Carine")
         
         if st.button("📥 Adicionar Dados Polyana", use_container_width=True):
             adicionar_dados_teste_polyana()
@@ -657,10 +687,11 @@ def fazer_login():
             # ===== DIAGNÓSTICO DO ERRO =====
             if usuario in usuarios:
                 st.sidebar.warning(f"⚠️ Usuário '{usuario}' existe, mas a senha está incorreta")
-                st.sidebar.info("💡 Use as ferramentas do sistema para resetar o usuário.")
+                st.sidebar.info("💡 Use 'Resetar Carine' nas ferramentas do sistema.")
             else:
                 st.sidebar.warning(f"⚠️ Usuário '{usuario}' não encontrado")
                 st.sidebar.info("Usuários disponíveis: " + ", ".join(usuarios.keys()))
+                st.sidebar.info("💡 Use 'Resetar Carine' nas ferramentas do sistema.")
     
     if st.session_state.get('logado', False):
         st.sidebar.success(f"✅ Logado como {st.session_state.nome_usuario}")
@@ -687,7 +718,6 @@ def fazer_login():
 
 def cadastrar_usuario():
     st.header("👤 Cadastrar Novo Usuário")
-    supabase = init_supabase()
     usuarios = carregar_usuarios()
     
     col1, col2 = st.columns(2)
@@ -714,26 +744,17 @@ def cadastrar_usuario():
             st.error("❌ Senha deve ter no mínimo 6 caracteres!")
         else:
             senha_hash = hash_senha(nova_senha)
-            if supabase:
-                if salvar_usuario_supabase(supabase, novo_usuario, novo_nome, senha_hash, gestor_usuario, acesso_total):
-                    st.success(f"✅ Usuário {novo_usuario} cadastrado!")
-                    st.rerun()
-                else:
-                    st.error("❌ Erro ao salvar no Supabase!")
+            usuarios[novo_usuario] = {
+                "senha": senha_hash,
+                "nome": novo_nome,
+                "gestor": gestor_usuario,
+                "acesso_total": acesso_total
+            }
+            if salvar_usuarios_local(usuarios):
+                st.success(f"✅ Usuário {novo_usuario} cadastrado!")
+                st.rerun()
             else:
-                usuarios[novo_usuario] = {
-                    "senha": senha_hash,
-                    "nome": novo_nome,
-                    "gestor": gestor_usuario,
-                    "acesso_total": acesso_total
-                }
-                try:
-                    with open('usuarios.json', 'w', encoding='utf-8') as f:
-                        json.dump(usuarios, f, ensure_ascii=False, indent=2)
-                    st.success(f"✅ Usuário {novo_usuario} cadastrado!")
-                    st.rerun()
-                except:
-                    st.error("❌ Erro ao salvar usuário!")
+                st.error("❌ Erro ao salvar usuário!")
     
     if st.button("🔙 Voltar"):
         st.session_state.cadastrar_usuario = False
