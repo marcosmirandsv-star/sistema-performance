@@ -373,14 +373,21 @@ def excluir_periodo(supabase, mes_ano, gestor):
         return False, "Supabase não configurado"
     
     try:
+        # Excluir do histórico
         supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        
+        # Excluir pódio manual associado
         supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         
-        if 'resultados' in st.session_state:
-            if st.session_state.get('periodo') == mes_ano:
-                st.session_state.resultados = {}
-                st.session_state.processado = False
-                st.session_state.periodo = None
+        # ===== LIMPAR COMPLETAMENTE O ESTADO =====
+        # Remover todas as chaves do session_state relacionadas a dados
+        keys_to_remove = ['resultados', 'processado', 'periodo', 'mostrar_periodos', 'mostrar_historico']
+        for key in keys_to_remove:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        # Forçar recarregamento da página
+        st.rerun()
         
         return True, "Período excluído com sucesso"
     except Exception as e:
@@ -399,11 +406,14 @@ def verificar_periodo_existente(supabase, mes_ano, gestor):
 
 def limpar_estado_sessao():
     """Limpa o estado da sessão quando não há dados"""
+    # Verificar se não há resultados ou se o período foi excluído
     if 'processado' in st.session_state and st.session_state.processado:
         if 'resultados' not in st.session_state or not st.session_state.resultados:
-            st.session_state.processado = False
-            st.session_state.resultados = {}
-            st.session_state.periodo = None
+            # Limpar todas as chaves relacionadas a dados
+            keys_to_remove = ['resultados', 'processado', 'periodo', 'mostrar_periodos', 'mostrar_historico']
+            for key in keys_to_remove:
+                if key in st.session_state:
+                    del st.session_state[key]
             return True
     return False
 
@@ -1975,7 +1985,8 @@ def main():
     if st.session_state.get('gerenciar_analistas', False):
         gerenciar_analistas_completo(analistas_config)
         
-        if st.button("🔙 Voltar", use_container_width=True):
+        # Botão Voltar com key única
+        if st.button("🔙 Voltar", key="voltar_gerenciar_analistas"):
             st.session_state.gerenciar_analistas = False
             st.rerun()
         
@@ -2035,7 +2046,6 @@ def main():
                                     sucesso, mensagem = excluir_periodo(supabase, periodo_para_excluir, gestor_periodo)
                                     if sucesso:
                                         st.success(f"✅ {mensagem}")
-                                        st.rerun()
                                     else:
                                         st.error(f"❌ Erro: {mensagem}")
             else:
@@ -2043,7 +2053,8 @@ def main():
         else:
             st.error("❌ Supabase não configurado.")
         
-        if st.button("🔙 Voltar"):
+        # Botão Voltar com key única
+        if st.button("🔙 Voltar", key="voltar_periodos"):
             st.session_state.mostrar_periodos = False
             st.rerun()
         
@@ -2110,7 +2121,8 @@ def main():
         else:
             st.error("❌ Supabase não configurado.")
         
-        if st.button("🔙 Voltar"):
+        # Botão Voltar com key única
+        if st.button("🔙 Voltar", key="voltar_historico"):
             st.session_state.mostrar_historico = False
             st.rerun()
         
