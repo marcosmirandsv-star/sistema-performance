@@ -1850,12 +1850,12 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
             st.markdown("---")
     
     with st.expander("📊 Análise Técnica", expanded=True):
-        analise_tecnica = gerar_analise_tecnica(analista, dados, media_atendimentos, podio)
+        analise_tecnica = gerar_analise_tecnica(analista, dados, media_operacao, podio)
         st.markdown(analise_tecnica)
     
     with st.expander("📝 Feedback de Performance", expanded=True):
         st.subheader(f"📝 Feedback - {analista}")
-        feedback_atual = gerar_feedback_manual(analista, dados, media_atendimentos, posicao_podio)
+        feedback_atual = gerar_feedback_manual(analista, dados, media_operacao, posicao_podio)
         
         feedback_editado = st.text_area(
             "✏️ Edite o feedback abaixo. Após editar, clique em 'Gerar com IA' para melhorar:",
@@ -1871,7 +1871,7 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
                     feedback_gerado = gerar_feedback_ia(
                         analista,
                         dados,
-                        media_atendimentos,
+                        media_operacao,
                         posicao_podio,
                         feedback_editado
                     )
@@ -1911,7 +1911,7 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
 - **Avaliações:** {dados['perc_avaliacoes']:.2f}% ({dados['positivos']} positivos + {dados['negativos']} negativos = {dados['avaliacoes']})
 - **% Envio:** {dados['perc_envio']:.2f}%
 - **Atendidos:** {dados['total_atendimentos']} - {dados['total_inativos']} = {dados['validos']}
-- **Média por agente:** {media_atendimentos}
+- **Média por agente:** {media_operacao}
 
 ---
 
@@ -1933,14 +1933,14 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
     with col1:
         st.download_button(
             label="📥 Baixar Análise (Word)",
-            data=gerar_relatorio_word(analista, dados, analise_tecnica, "", media_atendimentos, podio, periodo),
+            data=gerar_relatorio_word(analista, dados, analise_tecnica, "", media_operacao, podio, periodo),
             file_name=f"Analise_{analista.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
     with col2:
         st.download_button(
             label="📥 Baixar Relatório Completo (Word)",
-            data=gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_atendimentos, podio, periodo),
+            data=gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_operacao, podio, periodo),
             file_name=f"Relatorio_Completo_{analista.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
@@ -2241,232 +2241,238 @@ def main():
             st.rerun()
         st.markdown("---")
     
-    # ===== DASHBOARD PRINCIPAL =====
-if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+    # ============================================
+    # DASHBOARD PRINCIPAL - CORRIGIDO
+    # ============================================
     
-    periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
-    
-    # ===== SELETOR DE PERÍODO NA DASHBOARD =====
-    if supabase:
-        if acesso_total:
-            periodos_disponiveis = listar_periodos(supabase)
-        else:
-            periodos_disponiveis = listar_periodos(supabase, gestor_ativo)
+    # Verifica se há dados processados
+    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
         
-        if periodos_disponiveis:
-            periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
-            periodo_selecionado = st.selectbox(
-                "📅 Selecione o Período para visualizar",
-                periodos_lista,
-                index=0 if periodo in periodos_lista else 0,
-                key="seletor_periodo_dashboard"
-            )
-            if periodo_selecionado != periodo:
-                st.session_state.periodo = periodo_selecionado
-                st.rerun()
-    
-    # ===== CARREGAR DADOS COM FILTRO DE GESTOR =====
-    if acesso_total:
-        # COORDENADOR - Visualiza todos os dados
-        df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
-        st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
+        periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
         
-        if df_historico is not None and not df_historico.empty:
-            dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
-        else:
-            st.warning(f"⚠️ Nenhum dado encontrado para o período {st.session_state.periodo}")
-    
-    else:
-        # GESTOR - Visualiza apenas sua equipe
-        st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
-        
-        # Carregar dados APENAS do gestor atual
-        df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo, gestor=gestor_ativo)
-        
-        if df_historico is not None and not df_historico.empty:
-            # Converter para dicionário
-            resultados = {}
-            for _, row in df_historico.iterrows():
-                resultados[row['analista']] = {
-                    'total_atendimentos': row['total_atendimentos'],
-                    'total_inativos': row['total_inativos'],
-                    'validos': row['validos'],
-                    'avaliacoes': row['avaliacoes'],
-                    'positivos': row['positivos'],
-                    'negativos': row['negativos'],
-                    'perc_avaliacoes': row['perc_avaliacoes'],
-                    'perc_envio': row['perc_envio'],
-                    'csat': row['csat'],
-                    'meta_csat': row['meta_csat'],
-                    'delta_csat': row['delta_csat'],
-                    'meta_geral': row['meta_geral'],
-                    'status': row['status'],
-                    'gestor': row['gestor']
-                }
-            
-            # Atualizar session_state
-            st.session_state.resultados = resultados
-            
-            # Exibir dashboard do gestor
-            dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
-        else:
-            st.warning(f"⚠️ Nenhum dado encontrado para {gestor_ativo} no período {st.session_state.periodo}")
-            
-            # Tentar carregar o último período disponível para o gestor
-            periodos_gestor = listar_periodos(supabase, gestor_ativo)
-            if periodos_gestor:
-                periodos_ordenados = sorted(periodos_gestor, key=lambda x: x['mes_ano'], reverse=True)
-                ultimo_periodo = periodos_ordenados[0]
-                st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
-                st.session_state.periodo = ultimo_periodo['mes_ano']
-                st.rerun()
-        
-        # ===== EXIBIR DASHBOARD POR PERFIL =====
-        if acesso_total:
-            st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
-            dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
-        else:
-            st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
-            resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
-            
-            if resultados:
-                st.markdown("---")
-                
-                # ===== PÓDIO =====
-                st.subheader("🏆 Pódio do Mês")
-                
-                media_atendimentos = calcular_media_operacao(resultados)
-                podio = calcular_podio(resultados, media_atendimentos)
-                
-                if supabase and not acesso_total:
-                    try:
-                        podio_manual = carregar_podio_manual(supabase, st.session_state.periodo, gestor_ativo)
-                        if podio_manual:
-                            podio = podio_manual
-                    except:
-                        pass
-                
-                with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
-                    st.info("Ajuste manualmente os resultados do pódio se necessário.")
-                    podio_manual = []
-                    for i in range(3):
-                        col1, col2, col3 = st.columns([2, 1, 1])
-                        with col1:
-                            nome = podio[i][0] if i < len(podio) else ""
-                            nome_edit = st.text_input(f"{i+1}º - Nome", value=nome, key=f"podio_nome_{i}")
-                        with col2:
-                            csat = podio[i][1] if i < len(podio) else 0
-                            csat_edit = st.number_input(f"CSAT (%)", value=float(csat), key=f"podio_csat_{i}")
-                        with col3:
-                            atend = podio[i][2] if i < len(podio) else 0
-                            atend_edit = st.number_input(f"💬 Atendimentos", value=int(atend), key=f"podio_atend_{i}")
-                        if nome_edit:
-                            podio_manual.append((nome_edit, csat_edit, atend_edit, 0))
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if podio_manual and st.button("💾 Salvar Pódio Manual"):
-                            if supabase and not acesso_total:
-                                try:
-                                    sucesso, mensagem = salvar_podio_manual(supabase, st.session_state.periodo, gestor_ativo, podio_manual)
-                                    if sucesso:
-                                        podio = podio_manual
-                                        st.success("✅ Pódio salvo!")
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Erro: {mensagem}")
-                                except Exception as e:
-                                    st.error(f"Erro: {str(e)}")
-                            else:
-                                st.error("❌ Supabase não configurado.")
-                    
-                    with col2:
-                        if st.button("🔄 Resetar Pódio"):
-                            if supabase and not acesso_total:
-                                try:
-                                    supabase.table('podio_manual').delete().eq('mes_ano', st.session_state.periodo).eq('gestor', gestor_ativo).execute()
-                                    st.success("✅ Pódio resetado!")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Erro: {str(e)}")
-                            else:
-                                st.error("❌ Supabase não configurado.")
-                
-                if podio:
-                    col1, col2, col3 = st.columns(3)
-                    for i, (col, (nome, csat, atendimentos, perc_avaliacoes)) in enumerate(zip([col1, col2, col3], podio), 1):
-                        medalha = ["🥇", "🥈", "🥉"][i-1]
-                        cores = ['#FFD700', '#C0C0C0', '#CD7F32']
-                        with col:
-                            st.markdown(f"""
-                            <div style="text-align: center; padding: 20px; border: 2px solid #ddd; border-radius: 10px; background-color: {cores[i-1]}20;">
-                                <h1 style="font-size: 48px; margin: 0;">{medalha}</h1>
-                                <h3 style="margin: 5px 0;">{i}º Lugar</h3>
-                                <h2 style="margin: 5px 0;">{nome}</h2>
-                                <p style="font-size: 24px; font-weight: bold; margin: 5px 0;">{csat:.2f}%</p>
-                                <p style="margin: 5px 0;">CSAT</p>
-                                <p style="margin: 5px 0; font-size: 16px; color: #444;">💬 {atendimentos} atendimentos</p>
-                                <p style="margin: 5px 0; font-size: 14px; color: #28a745;">{perc_avaliacoes:.2f}% avaliações</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                else:
-                    st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
-                
-                st.markdown("---")
-                
-                # ===== RELATÓRIO INDIVIDUAL =====
-                st.subheader("📄 Gerar Relatório Individual")
-                
-                analista_selecionado = st.selectbox("Selecione o Analista", list(resultados.keys()))
-                
-                if analista_selecionado:
-                    dados = resultados[analista_selecionado]
-                    gerar_relatorio_individual(analista_selecionado, dados, media_atendimentos, podio, st.session_state.periodo, supabase, gestor_ativo, acesso_total)
-    
-    # ===== SE NÃO HOUVER DADOS, MOSTRA DASHBOARD VAZIO =====
-    elif not st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
-        
-        if acesso_total:
-            st.info("📊 Bem-vindo, Coordenador! Faça upload dos arquivos ou consulte o histórico.")
-        else:
-            st.info(f"📊 Bem-vindo, Gestor! Faça upload dos arquivos para sua equipe: {gestor_ativo}")
-        
+        # ===== SELETOR DE PERÍODO NA DASHBOARD =====
         if supabase:
             if acesso_total:
-                periodos = listar_periodos(supabase)
+                periodos_disponiveis = listar_periodos(supabase)
             else:
-                periodos = listar_periodos(supabase, gestor_ativo)
+                periodos_disponiveis = listar_periodos(supabase, gestor_ativo)
             
-            if periodos:
-                periodos_ordenados = sorted(periodos, key=lambda x: x['mes_ano'], reverse=True)
-                ultimo_periodo = periodos_ordenados[0]
-                st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
+            if periodos_disponiveis:
+                periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
+                periodo_selecionado = st.selectbox(
+                    "📅 Selecione o Período para visualizar",
+                    periodos_lista,
+                    index=0 if periodo in periodos_lista else 0,
+                    key="seletor_periodo_dashboard"
+                )
+                if periodo_selecionado != periodo:
+                    st.session_state.periodo = periodo_selecionado
+                    st.rerun()
+        
+        # ===== CARREGAR DADOS COM FILTRO DE GESTOR =====
+        if acesso_total:
+            # COORDENADOR - Visualiza todos os dados
+            df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
+            st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
+            
+            if df_historico is not None and not df_historico.empty:
+                dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
+            else:
+                st.warning(f"⚠️ Nenhum dado encontrado para o período {st.session_state.periodo}")
+        
+        else:
+            # GESTOR - Visualiza apenas sua equipe
+            st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
+            
+            # Carregar dados APENAS do gestor atual
+            df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo, gestor=gestor_ativo)
+            
+            if df_historico is not None and not df_historico.empty:
+                # Converter para dicionário
+                resultados = {}
+                for _, row in df_historico.iterrows():
+                    resultados[row['analista']] = {
+                        'total_atendimentos': row['total_atendimentos'],
+                        'total_inativos': row['total_inativos'],
+                        'validos': row['validos'],
+                        'avaliacoes': row['avaliacoes'],
+                        'positivos': row['positivos'],
+                        'negativos': row['negativos'],
+                        'perc_avaliacoes': row['perc_avaliacoes'],
+                        'perc_envio': row['perc_envio'],
+                        'csat': row['csat'],
+                        'meta_csat': row['meta_csat'],
+                        'delta_csat': row['delta_csat'],
+                        'meta_geral': row['meta_geral'],
+                        'status': row['status'],
+                        'gestor': row['gestor']
+                    }
                 
-                df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo['mes_ano'], gestor=ultimo_periodo['gestor'])
-                if df_historico is not None and not df_historico.empty:
-                    resultados = {}
-                    for _, row in df_historico.iterrows():
-                        resultados[row['analista']] = {
-                            'total_atendimentos': row['total_atendimentos'],
-                            'total_inativos': row['total_inativos'],
-                            'validos': row['validos'],
-                            'avaliacoes': row['avaliacoes'],
-                            'positivos': row['positivos'],
-                            'negativos': row['negativos'],
-                            'perc_avaliacoes': row['perc_avaliacoes'],
-                            'perc_envio': row['perc_envio'],
-                            'csat': row['csat'],
-                            'meta_csat': row['meta_csat'],
-                            'delta_csat': row['delta_csat'],
-                            'meta_geral': row['meta_geral'],
-                            'status': row['status'],
-                            'gestor': row['gestor']
-                        }
-                    st.session_state.resultados = resultados
-                    st.session_state.processado = True
+                # Atualizar session_state
+                st.session_state.resultados = resultados
+                
+                # Exibir dashboard do gestor
+                dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
+            else:
+                st.warning(f"⚠️ Nenhum dado encontrado para {gestor_ativo} no período {st.session_state.periodo}")
+                
+                # Tentar carregar o último período disponível para o gestor
+                periodos_gestor = listar_periodos(supabase, gestor_ativo)
+                if periodos_gestor:
+                    periodos_ordenados = sorted(periodos_gestor, key=lambda x: x['mes_ano'], reverse=True)
+                    ultimo_periodo = periodos_ordenados[0]
+                    st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
                     st.session_state.periodo = ultimo_periodo['mes_ano']
                     st.rerun()
+            
+            # ===== EXIBIR DASHBOARD POR PERFIL =====
+            if acesso_total:
+                st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
+                dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
+            else:
+                st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
+                resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
+                
+                if resultados:
+                    st.markdown("---")
+                    
+                    # ===== PÓDIO =====
+                    st.subheader("🏆 Pódio do Mês")
+                    
+                    media_atendimentos = calcular_media_operacao(resultados)
+                    podio = calcular_podio(resultados, media_atendimentos)
+                    
+                    if supabase and not acesso_total:
+                        try:
+                            podio_manual = carregar_podio_manual(supabase, st.session_state.periodo, gestor_ativo)
+                            if podio_manual:
+                                podio = podio_manual
+                        except:
+                            pass
+                    
+                    with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
+                        st.info("Ajuste manualmente os resultados do pódio se necessário.")
+                        podio_manual = []
+                        for i in range(3):
+                            col1, col2, col3 = st.columns([2, 1, 1])
+                            with col1:
+                                nome = podio[i][0] if i < len(podio) else ""
+                                nome_edit = st.text_input(f"{i+1}º - Nome", value=nome, key=f"podio_nome_{i}")
+                            with col2:
+                                csat = podio[i][1] if i < len(podio) else 0
+                                csat_edit = st.number_input(f"CSAT (%)", value=float(csat), key=f"podio_csat_{i}")
+                            with col3:
+                                atend = podio[i][2] if i < len(podio) else 0
+                                atend_edit = st.number_input(f"💬 Atendimentos", value=int(atend), key=f"podio_atend_{i}")
+                            if nome_edit:
+                                podio_manual.append((nome_edit, csat_edit, atend_edit, 0))
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if podio_manual and st.button("💾 Salvar Pódio Manual"):
+                                if supabase and not acesso_total:
+                                    try:
+                                        sucesso, mensagem = salvar_podio_manual(supabase, st.session_state.periodo, gestor_ativo, podio_manual)
+                                        if sucesso:
+                                            podio = podio_manual
+                                            st.success("✅ Pódio salvo!")
+                                            st.rerun()
+                                        else:
+                                            st.error(f"Erro: {mensagem}")
+                                    except Exception as e:
+                                        st.error(f"Erro: {str(e)}")
+                                else:
+                                    st.error("❌ Supabase não configurado.")
+                        
+                        with col2:
+                            if st.button("🔄 Resetar Pódio"):
+                                if supabase and not acesso_total:
+                                    try:
+                                        supabase.table('podio_manual').delete().eq('mes_ano', st.session_state.periodo).eq('gestor', gestor_ativo).execute()
+                                        st.success("✅ Pódio resetado!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro: {str(e)}")
+                                else:
+                                    st.error("❌ Supabase não configurado.")
+                    
+                    if podio:
+                        col1, col2, col3 = st.columns(3)
+                        for i, (col, (nome, csat, atendimentos, perc_avaliacoes)) in enumerate(zip([col1, col2, col3], podio), 1):
+                            medalha = ["🥇", "🥈", "🥉"][i-1]
+                            cores = ['#FFD700', '#C0C0C0', '#CD7F32']
+                            with col:
+                                st.markdown(f"""
+                                <div style="text-align: center; padding: 20px; border: 2px solid #ddd; border-radius: 10px; background-color: {cores[i-1]}20;">
+                                    <h1 style="font-size: 48px; margin: 0;">{medalha}</h1>
+                                    <h3 style="margin: 5px 0;">{i}º Lugar</h3>
+                                    <h2 style="margin: 5px 0;">{nome}</h2>
+                                    <p style="font-size: 24px; font-weight: bold; margin: 5px 0;">{csat:.2f}%</p>
+                                    <p style="margin: 5px 0;">CSAT</p>
+                                    <p style="margin: 5px 0; font-size: 16px; color: #444;">💬 {atendimentos} atendimentos</p>
+                                    <p style="margin: 5px 0; font-size: 14px; color: #28a745;">{perc_avaliacoes:.2f}% avaliações</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    else:
+                        st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
+                    
+                    st.markdown("---")
+                    
+                    # ===== RELATÓRIO INDIVIDUAL =====
+                    st.subheader("📄 Gerar Relatório Individual")
+                    
+                    analista_selecionado = st.selectbox("Selecione o Analista", list(resultados.keys()))
+                    
+                    if analista_selecionado:
+                        dados = resultados[analista_selecionado]
+                        gerar_relatorio_individual(analista_selecionado, dados, media_atendimentos, podio, st.session_state.periodo, supabase, gestor_ativo, acesso_total)
     
+    # ===== SE NÃO HOUVER DADOS PROCESSADOS =====
+    else:
+        # Verifica se estamos em outras páginas (gerenciar_analistas, mostrar_historico, mostrar_periodos)
+        if not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+            
+            if acesso_total:
+                st.info("📊 Bem-vindo, Coordenador! Faça upload dos arquivos ou consulte o histórico.")
+            else:
+                st.info(f"📊 Bem-vindo, Gestor! Faça upload dos arquivos para sua equipe: {gestor_ativo}")
+            
+            if supabase:
+                if acesso_total:
+                    periodos = listar_periodos(supabase)
+                else:
+                    periodos = listar_periodos(supabase, gestor_ativo)
+                
+                if periodos:
+                    periodos_ordenados = sorted(periodos, key=lambda x: x['mes_ano'], reverse=True)
+                    ultimo_periodo = periodos_ordenados[0]
+                    st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
+                    
+                    df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo['mes_ano'], gestor=ultimo_periodo['gestor'])
+                    if df_historico is not None and not df_historico.empty:
+                        resultados = {}
+                        for _, row in df_historico.iterrows():
+                            resultados[row['analista']] = {
+                                'total_atendimentos': row['total_atendimentos'],
+                                'total_inativos': row['total_inativos'],
+                                'validos': row['validos'],
+                                'avaliacoes': row['avaliacoes'],
+                                'positivos': row['positivos'],
+                                'negativos': row['negativos'],
+                                'perc_avaliacoes': row['perc_avaliacoes'],
+                                'perc_envio': row['perc_envio'],
+                                'csat': row['csat'],
+                                'meta_csat': row['meta_csat'],
+                                'delta_csat': row['delta_csat'],
+                                'meta_geral': row['meta_geral'],
+                                'status': row['status'],
+                                'gestor': row['gestor']
+                            }
+                        st.session_state.resultados = resultados
+                        st.session_state.processado = True
+                        st.session_state.periodo = ultimo_periodo['mes_ano']
+                        st.rerun()
+
     st.markdown("---")
     st.markdown(
         """
