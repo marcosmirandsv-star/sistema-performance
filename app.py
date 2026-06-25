@@ -50,21 +50,56 @@ def init_supabase():
         return None
 
 # ============================================
+# FUNÇÕES DE FORÇAGEM DE PERFIL E CACHE
+# ============================================
+
+def forcar_perfil_correto():
+    """Força o perfil correto para cada usuário"""
+    if not st.session_state.get('logado', False):
+        return
+    
+    usuario = st.session_state.get('usuario', '')
+    
+    # Força o perfil baseado no usuário
+    if usuario == 'marcos':
+        st.session_state.acesso_total = False
+        st.session_state.perfil = "Gestor"
+        st.session_state.gestor = GESTOR_MARCOS
+    elif usuario == 'polyana':
+        st.session_state.acesso_total = False
+        st.session_state.perfil = "Gestor"
+        st.session_state.gestor = GESTOR_POLYANA
+    elif usuario == 'carine':
+        st.session_state.acesso_total = True
+        st.session_state.perfil = "Coordenador"
+        st.session_state.gestor = GESTOR_MARCOS
+
+def limpar_cache_completo():
+    """Limpa todo o cache do sistema"""
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    
+    keys_to_clear = ['resultados', 'processado', 'periodo', 'df_historico']
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    forcar_perfil_correto()
+    st.success("✅ Cache limpo e perfil forçado!")
+    st.rerun()
+
+# ============================================
 # FUNÇÕES DE RESET E DIAGNÓSTICO
 # ============================================
 
 def resetar_usuario_carine():
-    """Resetar a Carine no Supabase"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
         return False
     
     try:
-        # Remove usuário se existir
         supabase.table('usuarios').delete().eq('usuario', 'carine').execute()
-        
-        # Insere com senha padrão e acesso total
         supabase.table('usuarios').insert({
             'usuario': 'carine',
             'nome': 'Carine Melo',
@@ -72,15 +107,13 @@ def resetar_usuario_carine():
             'gestor': GESTOR_MARCOS,
             'acesso_total': True
         }).execute()
-        
-        st.success("✅ Usuário Carine resetado com sucesso no Supabase!")
+        st.success("✅ Usuário Carine resetado com sucesso!")
         return True
     except Exception as e:
         st.error(f"❌ Erro ao resetar: {str(e)}")
         return False
 
 def resetar_usuario_marcos():
-    """Resetar o Marcos no Supabase"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
@@ -88,7 +121,6 @@ def resetar_usuario_marcos():
     
     try:
         supabase.table('usuarios').delete().eq('usuario', 'marcos').execute()
-        
         supabase.table('usuarios').insert({
             'usuario': 'marcos',
             'nome': 'Marcos Miranda',
@@ -96,15 +128,13 @@ def resetar_usuario_marcos():
             'gestor': GESTOR_MARCOS,
             'acesso_total': False
         }).execute()
-        
-        st.success("✅ Usuário Marcos resetado com sucesso no Supabase!")
+        st.success("✅ Usuário Marcos resetado com sucesso!")
         return True
     except Exception as e:
         st.error(f"❌ Erro ao resetar: {str(e)}")
         return False
 
 def resetar_usuario_polyana():
-    """Resetar a Polyana no Supabase"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
@@ -112,7 +142,6 @@ def resetar_usuario_polyana():
     
     try:
         supabase.table('usuarios').delete().eq('usuario', 'polyana').execute()
-        
         supabase.table('usuarios').insert({
             'usuario': 'polyana',
             'nome': 'Polyana Ventura',
@@ -120,56 +149,38 @@ def resetar_usuario_polyana():
             'gestor': GESTOR_POLYANA,
             'acesso_total': False
         }).execute()
-        
-        st.success("✅ Usuário Polyana resetado com sucesso no Supabase!")
+        st.success("✅ Usuário Polyana resetado com sucesso!")
         return True
     except Exception as e:
         st.error(f"❌ Erro ao resetar: {str(e)}")
         return False
 
 def adicionar_dados_teste_polyana():
-    """Função para adicionar dados de teste para TODOS os analistas da Polyana"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
         return False
     
     try:
-        # Verifica se já existem dados
         existing = supabase.table('historico_performance').select('*').eq('gestor', GESTOR_POLYANA).eq('mes_ano', 'Maio 2026').execute()
         if existing.data:
             st.info("ℹ️ Dados para Polyana já existem.")
             return True
         
-        # LISTA COMPLETA DOS ANALISTAS DA POLYANA
         analistas_polyana = [
-            'Christian Matozinho',
-            'Diego Machado',
-            'Igor Siqueira',
-            'Ismael Chagas Bessa',
-            'João Pedro Santana',
-            'Karolyne Moreira',
-            'Luan Pereira',
-            'Mario Junior',
-            'Maycon Oliveira',
-            'Miguel Augusto',
-            'Polliana Santana'
+            'Christian Matozinho', 'Diego Machado', 'Igor Siqueira',
+            'Ismael Chagas Bessa', 'João Pedro Santana', 'Karolyne Moreira',
+            'Luan Pereira', 'Mario Junior', 'Maycon Oliveira',
+            'Miguel Augusto', 'Polliana Santana'
         ]
         
-        # Dados de exemplo para TODOS os analistas da Polyana
         dados_teste = []
-        
-        # Dados variados para cada analista
         for i, analista in enumerate(analistas_polyana):
-            # Gera dados variados para cada analista
-            csat_base = 85 + (i * 0.7) % 12  # Varia entre 85 e 97
-            avaliacoes_base = 22 + (i * 0.5) % 8  # Varia entre 22 e 30
-            atendimentos_base = 130 + (i * 3) % 30  # Varia entre 130 e 160
-            
-            # Determina meta CSAT (90 para João Pedro Santana e Mario Junior, 86 para os demais)
+            csat_base = 85 + (i * 0.7) % 12
+            avaliacoes_base = 22 + (i * 0.5) % 8
+            atendimentos_base = 130 + (i * 3) % 30
             meta_csat = 90 if analista in ['João Pedro Santana', 'Mario Junior'] else 86
             
-            # Calcula status
             if csat_base >= meta_csat and avaliacoes_base >= 25:
                 status = "🟢 Meta Superada"
             elif csat_base >= meta_csat or avaliacoes_base >= 25:
@@ -199,14 +210,13 @@ def adicionar_dados_teste_polyana():
         for dado in dados_teste:
             supabase.table('historico_performance').insert(dado).execute()
         
-        st.success(f"✅ Dados de teste para {len(dados_teste)} analistas da Polyana adicionados com sucesso!")
+        st.success(f"✅ Dados para {len(dados_teste)} analistas da Polyana adicionados!")
         return True
     except Exception as e:
-        st.error(f"❌ Erro ao adicionar dados: {str(e)}")
+        st.error(f"❌ Erro: {str(e)}")
         return False
 
 def diagnosticar_sistema():
-    """Função de diagnóstico do sistema"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
@@ -214,7 +224,6 @@ def diagnosticar_sistema():
     
     st.subheader("🔍 Diagnóstico do Sistema")
     
-    # Verifica usuários no Supabase
     try:
         response = supabase.table('usuarios').select('*').execute()
         st.write("📋 Usuários no Supabase:")
@@ -222,48 +231,20 @@ def diagnosticar_sistema():
             st.write(f"- **{user['usuario']}** ({user['nome']}) - Acesso Total: {user.get('acesso_total', False)} - Gestor: {user['gestor']}")
     except Exception as e:
         st.warning(f"⚠️ Erro ao buscar usuários: {str(e)}")
-        st.info("💡 A tabela 'usuarios' pode não existir. Execute o script SQL para criá-la.")
     
-    # Verifica configuração dos analistas
     st.write("📋 Configuração dos Analistas:")
     analistas_config = carregar_analistas()
-    
     for gestor, config in analistas_config.items():
-        st.write(f"**{gestor}** - {len(config['membros'])} analistas:")
-        for analista, dados in config['membros'].items():
-            st.write(f"  - {analista} (Meta: {dados['meta_csat']}%, Ativo: {dados['ativo']})")
-    
-    # Verifica períodos
-    try:
-        response = supabase.table('historico_performance').select('mes_ano, gestor, analista').execute()
-        st.write("📊 Dados no Supabase por Gestor:")
-        dados_por_gestor = {}
-        for item in response.data:
-            key = item['gestor']
-            if key not in dados_por_gestor:
-                dados_por_gestor[key] = []
-            dados_por_gestor[key].append(item['analista'])
-        
-        for gestor, analistas in dados_por_gestor.items():
-            st.write(f"**{gestor}** - {len(analistas)} analistas:")
-            for analista in analistas[:5]:  # Mostra apenas os 5 primeiros para não poluir
-                st.write(f"  - {analista}")
-            if len(analistas) > 5:
-                st.write(f"  - ... e mais {len(analistas) - 5} analistas")
-    except Exception as e:
-        st.error(f"Erro ao buscar dados: {e}")
+        st.write(f"**{gestor}** - {len(config['membros'])} analistas")
 
 def gerenciar_usuarios_supabase():
-    """Interface para gerenciar usuários no Supabase"""
     st.header("👥 Gerenciar Usuários no Supabase")
-    
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
         return
     
     try:
-        # Lista usuários
         response = supabase.table('usuarios').select('*').execute()
         usuarios = response.data
         
@@ -280,63 +261,9 @@ def gerenciar_usuarios_supabase():
             st.dataframe(pd.DataFrame(dados_tabela), use_container_width=True, hide_index=True)
         
         st.markdown("---")
-        st.subheader("✏️ Atualizar/Resetar Usuário")
-        
-        if usuarios:
-            col1, col2 = st.columns(2)
-            with col1:
-                usuario_selecionado = st.selectbox("Selecione um usuário", [u['usuario'] for u in usuarios])
-            with col2:
-                if st.button("🔄 Resetar Senha", use_container_width=True):
-                    st.session_state.resetar_senha_usuario = usuario_selecionado
-                    st.rerun()
-            
-            if st.session_state.get('resetar_senha_usuario'):
-                usuario_reset = st.session_state.resetar_senha_usuario
-                st.info(f"Resetando senha de: {usuario_reset}")
-                nova_senha = st.text_input("Nova senha (mínimo 6 caracteres)", type="password", key="nova_senha_input")
-                if st.button("Confirmar Reset", use_container_width=True):
-                    if nova_senha and len(nova_senha) >= 6:
-                        supabase.table('usuarios').update({
-                            'senha': hash_senha(nova_senha)
-                        }).eq('usuario', usuario_reset).execute()
-                        st.success(f"✅ Senha de {usuario_reset} resetada!")
-                        del st.session_state.resetar_senha_usuario
-                        st.rerun()
-                    else:
-                        st.error("❌ Senha deve ter no mínimo 6 caracteres")
-        
-        st.markdown("---")
-        st.subheader("🔄 Trocar Perfil")
-        
-        if usuarios:
-            col1, col2 = st.columns(2)
-            with col1:
-                usuario_para_trocar = st.selectbox("Selecione o usuário", [u['usuario'] for u in usuarios], key="trocar_perfil")
-            with col2:
-                # Pega o perfil atual
-                perfil_atual = next((u.get('acesso_total') for u in usuarios if u['usuario'] == usuario_para_trocar), False)
-                perfil_atual_texto = "Coordenador" if perfil_atual else "Gestor"
-                
-                novo_perfil = st.selectbox(
-                    "Novo Perfil", 
-                    ['Gestor', 'Coordenador'],
-                    index=1 if perfil_atual else 0
-                )
-                acesso = True if novo_perfil == 'Coordenador' else False
-                
-                if st.button("✅ Atualizar Perfil", use_container_width=True):
-                    supabase.table('usuarios').update({
-                        'acesso_total': acesso
-                    }).eq('usuario', usuario_para_trocar).execute()
-                    st.success(f"✅ Perfil de {usuario_para_trocar} atualizado para {novo_perfil}!")
-                    st.rerun()
-        
-        st.markdown("---")
         if st.button("🔙 Voltar", key="voltar_usuarios"):
             st.session_state.gerenciar_usuarios = False
             st.rerun()
-            
     except Exception as e:
         st.error(f"❌ Erro: {str(e)}")
 
@@ -364,13 +291,13 @@ def identificar_coluna_flexivel(df, padroes):
 def carregar_arquivo_satisfacao(arquivo):
     try:
         df = pd.read_excel(arquivo)
-    except Exception as e:
+    except:
         try:
             df = pd.read_csv(arquivo, encoding='utf-8')
         except:
             try:
                 df = pd.read_csv(arquivo, encoding='latin-1')
-            except:
+            except Exception as e:
                 st.error(f"❌ Não foi possível ler o arquivo de satisfação: {str(e)}")
                 return None
     
@@ -378,12 +305,8 @@ def carregar_arquivo_satisfacao(arquivo):
     st.info(f"🔍 Colunas encontradas: {', '.join(colunas)}")
     
     col_id = identificar_coluna_flexivel(df, ['ID do ticket', 'Ticket ID', 'ID', 'ticket_id'])
-    col_satisfacao = identificar_coluna_flexivel(df, [
-        'Índice de satisfação do ticket', 'Satisfaction', 'satisfacao', 'satisfação'
-    ])
-    col_atribuido = identificar_coluna_flexivel(df, [
-        'Nome do atribuído', 'Assignee', 'Atribuído', 'Responsável'
-    ])
+    col_satisfacao = identificar_coluna_flexivel(df, ['Índice de satisfação do ticket', 'Satisfaction', 'satisfacao', 'satisfação'])
+    col_atribuido = identificar_coluna_flexivel(df, ['Nome do atribuído', 'Assignee', 'Atribuído', 'Responsável'])
     
     if not col_id or not col_satisfacao or not col_atribuido:
         st.error("❌ Colunas necessárias não encontradas")
@@ -412,13 +335,13 @@ def carregar_arquivo_satisfacao(arquivo):
 def carregar_arquivo_inativos(arquivo):
     try:
         df = pd.read_excel(arquivo)
-    except Exception as e:
+    except:
         try:
             df = pd.read_csv(arquivo, encoding='utf-8')
         except:
             try:
                 df = pd.read_csv(arquivo, encoding='latin-1')
-            except:
+            except Exception as e:
                 st.error(f"❌ Não foi possível ler o arquivo de inativos: {str(e)}")
                 return None
     
@@ -426,9 +349,7 @@ def carregar_arquivo_inativos(arquivo):
     st.info(f"🔍 Colunas encontradas: {', '.join(colunas)}")
     
     col_id = identificar_coluna_flexivel(df, ['ID do ticket', 'Ticket ID', 'ID', 'ticket_id'])
-    col_atribuido = identificar_coluna_flexivel(df, [
-        'Nome do atribuído', 'Assignee', 'Atribuído', 'Responsável'
-    ])
+    col_atribuido = identificar_coluna_flexivel(df, ['Nome do atribuído', 'Assignee', 'Atribuído', 'Responsável'])
     
     if not col_id or not col_atribuido:
         st.error("❌ Colunas necessárias não encontradas")
@@ -545,9 +466,7 @@ def listar_periodos(supabase, gestor=None):
             query = query.eq('gestor', gestor)
         response = query.execute()
         
-        # ===== DIAGNÓSTICO =====
         if gestor and len(response.data) == 0:
-            # Tenta buscar todos os gestores para diagnóstico
             all_response = supabase.table('historico_performance').select('gestor').execute()
             gestores_existentes = set([r['gestor'] for r in all_response.data])
             if gestores_existentes:
@@ -640,9 +559,6 @@ def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
 def carregar_usuarios():
-    """Carrega usuários do Supabase (prioridade) ou do arquivo local"""
-    
-    # Tenta carregar do Supabase primeiro
     supabase = init_supabase()
     if supabase:
         try:
@@ -660,7 +576,6 @@ def carregar_usuarios():
         except Exception as e:
             st.warning(f"⚠️ Erro ao carregar do Supabase: {str(e)}")
     
-    # Fallback: arquivo local
     try:
         if os.path.exists('usuarios.json'):
             with open('usuarios.json', 'r', encoding='utf-8') as f:
@@ -668,7 +583,6 @@ def carregar_usuarios():
     except:
         pass
     
-    # Usuários padrão (emergência)
     usuarios = {
         "marcos": {
             "senha": hash_senha("marcos2026"),
@@ -699,16 +613,12 @@ def carregar_usuarios():
     return usuarios
 
 def salvar_usuario_supabase(supabase, usuario, nome, senha_hash, gestor, acesso_total=False):
-    """Salva ou atualiza um usuário no Supabase"""
     if not supabase:
         return False
     
     try:
-        # Verifica se o usuário já existe
         existing = supabase.table('usuarios').select('*').eq('usuario', usuario).execute()
-        
         if existing.data:
-            # Atualiza usuário existente
             supabase.table('usuarios').update({
                 'nome': nome,
                 'senha': senha_hash,
@@ -716,7 +626,6 @@ def salvar_usuario_supabase(supabase, usuario, nome, senha_hash, gestor, acesso_
                 'acesso_total': acesso_total
             }).eq('usuario', usuario).execute()
         else:
-            # Insere novo usuário
             supabase.table('usuarios').insert({
                 'usuario': usuario,
                 'nome': nome,
@@ -724,14 +633,12 @@ def salvar_usuario_supabase(supabase, usuario, nome, senha_hash, gestor, acesso_
                 'gestor': gestor,
                 'acesso_total': acesso_total
             }).execute()
-        
         return True
     except Exception as e:
         print(f"Erro ao salvar usuário: {e}")
         return False
 
 def salvar_usuarios_local(usuarios):
-    """Salva usuários no arquivo local (fallback)"""
     try:
         with open('usuarios.json', 'w', encoding='utf-8') as f:
             json.dump(usuarios, f, ensure_ascii=False, indent=2)
@@ -744,20 +651,15 @@ def salvar_usuarios_local(usuarios):
 # ============================================
 
 def carregar_analistas():
-    """Carrega analistas com a configuração correta para ambos os gestores"""
     try:
         if os.path.exists('analistas.json'):
             with open('analistas.json', 'r', encoding='utf-8') as f:
                 config = json.load(f)
-                # Verifica se a configuração está completa
                 if GESTOR_POLYANA in config and len(config[GESTOR_POLYANA]['membros']) >= 11:
                     return config
-                else:
-                    st.warning("⚠️ Configuração dos analistas incompleta. Recriando...")
     except:
         pass
     
-    # Configuração COMPLETA dos analistas
     config = {
         GESTOR_MARCOS: {
             "gestor": "Marcos Miranda",
@@ -796,7 +698,6 @@ def carregar_analistas():
     try:
         with open('analistas.json', 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-        st.success("✅ Arquivo analistas.json recriado com todos os analistas!")
     except:
         pass
     
@@ -818,32 +719,27 @@ def fazer_login():
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔐 Login")
     
-    # ===== BOTÃO DE FERRAMENTAS =====
     with st.sidebar.expander("🔧 Ferramentas do Sistema", expanded=False):
         if st.button("🔄 Resetar Carine", use_container_width=True):
             resetar_usuario_carine()
             st.rerun()
-        
         if st.button("🔄 Resetar Marcos", use_container_width=True):
             resetar_usuario_marcos()
             st.rerun()
-        
         if st.button("🔄 Resetar Polyana", use_container_width=True):
             resetar_usuario_polyana()
             st.rerun()
-        
         if st.button("📥 Adicionar TODOS os Analistas da Polyana", use_container_width=True):
             adicionar_dados_teste_polyana()
             st.rerun()
-        
+        if st.button("🧹 LIMPAR CACHE E FORÇAR PERFIL", use_container_width=True):
+            limpar_cache_completo()
         if st.button("👥 Gerenciar Usuários (Supabase)", use_container_width=True):
             st.session_state.gerenciar_usuarios = True
             st.rerun()
-        
         if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
             diagnosticar_sistema()
     
-    # ===== LOGIN =====
     usuarios = carregar_usuarios()
     usuario = st.sidebar.text_input("Usuário")
     senha = st.sidebar.text_input("Senha", type="password")
@@ -856,6 +752,10 @@ def fazer_login():
             st.session_state.gestor = usuarios[usuario]["gestor"]
             st.session_state.acesso_total = usuarios[usuario].get("acesso_total", False)
             st.session_state.perfil = "Coordenador" if st.session_state.acesso_total else "Gestor"
+            
+            # FORÇA O PERFIL CORRETO APÓS LOGIN
+            forcar_perfil_correto()
+            
             st.rerun()
         else:
             st.sidebar.error("❌ Usuário ou senha inválidos!")
@@ -865,9 +765,23 @@ def fazer_login():
             else:
                 st.sidebar.warning(f"⚠️ Usuário '{usuario}' não encontrado")
                 st.sidebar.info("Usuários disponíveis: " + ", ".join(usuarios.keys()))
-                st.sidebar.info("💡 Use 'Resetar' nas ferramentas do sistema.")
     
     if st.session_state.get('logado', False):
+        # Diagnóstico do perfil na sidebar
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("👤 Perfil Atual")
+        st.sidebar.write(f"**Usuário:** {st.session_state.get('usuario')}")
+        st.sidebar.write(f"**Acesso Total:** {st.session_state.get('acesso_total')}")
+        st.sidebar.write(f"**Perfil:** {st.session_state.get('perfil')}")
+        st.sidebar.write(f"**Gestor:** {st.session_state.get('gestor')}")
+        
+        if st.session_state.get('usuario') == 'marcos':
+            st.sidebar.info("👥 Deveria ver: 9 analistas (time Marcos)")
+        elif st.session_state.get('usuario') == 'polyana':
+            st.sidebar.info("👥 Deveria ver: 11 analistas (time Polyana)")
+        elif st.session_state.get('usuario') == 'carine':
+            st.sidebar.info("👥 Deveria ver: 20 analistas (todos)")
+        
         st.sidebar.success(f"✅ Logado como {st.session_state.nome_usuario}")
         
         if st.session_state.get('acesso_total', False):
@@ -886,6 +800,10 @@ def fazer_login():
             st.session_state.gestor = None
             st.session_state.acesso_total = False
             st.session_state.perfil = None
+            keys_to_clear = ['resultados', 'processado', 'periodo', 'df_historico']
+            for key in keys_to_clear:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
         return True
     return False
@@ -923,7 +841,6 @@ def cadastrar_usuario():
                 else:
                     st.error("❌ Erro ao salvar no Supabase!")
             else:
-                # Fallback para arquivo local
                 usuarios[novo_usuario] = {
                     "senha": senha_hash,
                     "nome": novo_nome,
@@ -1227,16 +1144,12 @@ def ordenar_meses(meses):
 # ============================================
 
 def dashboard_gestor(periodo, gestor_nome, supabase):
-    """Dashboard específica para Gestor - mostra apenas sua equipe"""
-    
-    # Carregar dados do período e gestor
     df_historico = carregar_historico(supabase, mes_ano=periodo, gestor=gestor_nome)
     
     if df_historico is None or df_historico.empty:
         st.warning(f"⚠️ Nenhum dado encontrado para {gestor_nome} no período {periodo}")
         return None
     
-    # Converter para dicionário
     resultados = {}
     for _, row in df_historico.iterrows():
         resultados[row['analista']] = {
@@ -1256,7 +1169,6 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
             'gestor': row['gestor']
         }
     
-    # Calcular métricas agregadas
     total_analistas = len(resultados)
     total_atendimentos = sum([d['total_atendimentos'] for d in resultados.values()])
     media_atendimentos = total_atendimentos / total_analistas if total_analistas > 0 else 0
@@ -1265,7 +1177,6 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     perc_envio_medio = sum([d['perc_envio'] for d in resultados.values()]) / total_analistas if total_analistas > 0 else 0
     metas_superadas = len([d for d in resultados.values() if d['status'] == '🟢 Meta Superada'])
     
-    # CARDS DE INDICADORES
     dados_cards = {
         'total_registros': total_analistas,
         'csat_medio': csat_medio,
@@ -1281,10 +1192,8 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     st.info(f"📅 Período: {periodo} | 👤 Gestor: {gestor_nome} | 🏆 Metas Superadas: {metas_superadas}/{total_analistas}")
     st.markdown("---")
     
-    # SAÚDE DA EQUIPE
     criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat, meta_avaliacoes, meta_envio)
     
-    # GRÁFICOS DE EVOLUÇÃO
     st.subheader("📈 Evolução dos Indicadores")
     df_historico_completo = carregar_historico(supabase, gestor=gestor_nome)
     
@@ -1311,7 +1220,6 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     
     st.markdown("---")
     
-    # TOP E BOTTOM PERFORMERS
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🏆 Top Performers da Equipe")
@@ -1337,7 +1245,6 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     
     st.markdown("---")
     
-    # TABELA DE DESEMPENHO
     st.subheader("📋 Desempenho da Equipe")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
@@ -1479,7 +1386,7 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
 
 # ============================================
-# FUNÇÕES DE RELATÓRIOS (RESUMIDAS)
+# FUNÇÕES DE RELATÓRIOS
 # ============================================
 
 def gerar_analise_tecnica(analista, dados, media_operacao, podio):
@@ -1965,6 +1872,9 @@ def main():
         st.info("👋 Faça login na barra lateral para acessar o sistema.")
         return
     
+    # ===== FORÇA O PERFIL CORRETO =====
+    forcar_perfil_correto()
+    
     if st.session_state.get('cadastrar_usuario', False):
         cadastrar_usuario()
         return
@@ -2164,6 +2074,17 @@ def main():
                     st.session_state.periodo = periodo_selecionado
                     st.rerun()
         
+        # ===== GARANTE QUE O ACESSO TOTAL ESTÁ CORRETO =====
+        if st.session_state.get('usuario') == 'marcos':
+            acesso_total = False
+            st.session_state.acesso_total = False
+        elif st.session_state.get('usuario') == 'polyana':
+            acesso_total = False
+            st.session_state.acesso_total = False
+        elif st.session_state.get('usuario') == 'carine':
+            acesso_total = True
+            st.session_state.acesso_total = True
+        
         if acesso_total:
             df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
             st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
@@ -2206,59 +2127,21 @@ def main():
                     st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
                     st.session_state.periodo = ultimo_periodo['mes_ano']
                     st.rerun()
-            
-            # EXIBIR DASHBOARD POR PERFIL
-            if acesso_total:
-                st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
-                dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
-            else:
-                st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
-                resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
-                
-                if resultados:
-                    st.markdown("---")
-                    st.subheader("🏆 Pódio do Mês")
-                    
-                    media_atendimentos = calcular_media_operacao(resultados)
-                    podio = calcular_podio(resultados, media_atendimentos)
-                    
-                    if supabase and not acesso_total:
-                        try:
-                            podio_manual = carregar_podio_manual(supabase, st.session_state.periodo, gestor_ativo)
-                            if podio_manual:
-                                podio = podio_manual
-                        except:
-                            pass
-                    
-                    if podio:
-                        col1, col2, col3 = st.columns(3)
-                        for i, (col, (nome, csat, atendimentos, perc_avaliacoes)) in enumerate(zip([col1, col2, col3], podio), 1):
-                            medalha = ["🥇", "🥈", "🥉"][i-1]
-                            cores = ['#FFD700', '#C0C0C0', '#CD7F32']
-                            with col:
-                                st.markdown(f"""
-                                <div style="text-align: center; padding: 20px; border: 2px solid #ddd; border-radius: 10px; background-color: {cores[i-1]}20;">
-                                    <h1 style="font-size: 48px; margin: 0;">{medalha}</h1>
-                                    <h3 style="margin: 5px 0;">{i}º Lugar</h3>
-                                    <h2 style="margin: 5px 0;">{nome}</h2>
-                                    <p style="font-size: 24px; font-weight: bold; margin: 5px 0;">{csat:.2f}%</p>
-                                    <p style="margin: 5px 0;">CSAT</p>
-                                    <p style="margin: 5px 0; font-size: 16px; color: #444;">💬 {atendimentos} atendimentos</p>
-                                    <p style="margin: 5px 0; font-size: 14px; color: #28a745;">{perc_avaliacoes:.2f}% avaliações</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                    else:
-                        st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
-                    
-                    st.markdown("---")
-                    st.subheader("📄 Gerar Relatório Individual")
-                    analista_selecionado = st.selectbox("Selecione o Analista", list(resultados.keys()))
-                    if analista_selecionado:
-                        dados = resultados[analista_selecionado]
-                        gerar_relatorio_individual(analista_selecionado, dados, media_atendimentos, podio, st.session_state.periodo, supabase, gestor_ativo, acesso_total)
     
     else:
         if not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+            
+            # ===== GARANTE QUE O ACESSO TOTAL ESTÁ CORRETO =====
+            if st.session_state.get('usuario') == 'marcos':
+                acesso_total = False
+                st.session_state.acesso_total = False
+            elif st.session_state.get('usuario') == 'polyana':
+                acesso_total = False
+                st.session_state.acesso_total = False
+            elif st.session_state.get('usuario') == 'carine':
+                acesso_total = True
+                st.session_state.acesso_total = True
+            
             if acesso_total:
                 st.info("📊 Bem-vindo, Coordenador! Faça upload dos arquivos ou consulte o histórico.")
             else:
