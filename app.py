@@ -770,26 +770,10 @@ def fazer_login():
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔐 Login")
     
-    with st.sidebar.expander("🔧 Ferramentas do Sistema", expanded=False):
-        if st.button("🔄 Resetar Carine", use_container_width=True):
-            resetar_usuario_carine()
-            st.rerun()
-        if st.button("🔄 Resetar Marcos", use_container_width=True):
-            resetar_usuario_marcos()
-            st.rerun()
-        if st.button("🔄 Resetar Polyana", use_container_width=True):
-            resetar_usuario_polyana()
-            st.rerun()
-        if st.button("📥 Adicionar TODOS os Analistas da Polyana", use_container_width=True):
-            adicionar_dados_teste_polyana()
-            st.rerun()
-        if st.button("🧹 LIMPAR CACHE E FORÇAR PERFIL", use_container_width=True):
-            limpar_cache_completo()
-        if st.button("👥 Gerenciar Usuários (Supabase)", use_container_width=True):
-            st.session_state.gerenciar_usuarios = True
-            st.rerun()
-        if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
-            diagnosticar_sistema()
+    # ===== FERRAMENTAS DO SISTEMA REMOVIDAS DA TELA PÚBLICA =====
+    # O expander "🔧 Ferramentas do Sistema" foi completamente removido
+    # daqui por questões de segurança. Agora está disponível apenas
+    # para usuários logados em "⚙️ Configurações" na sidebar.
     
     usuarios = carregar_usuarios()
     usuario = st.sidebar.text_input("Usuário")
@@ -812,7 +796,7 @@ def fazer_login():
             st.sidebar.error("❌ Usuário ou senha inválidos!")
             if usuario in usuarios:
                 st.sidebar.warning(f"⚠️ Usuário '{usuario}' existe, mas a senha está incorreta")
-                st.sidebar.info("💡 Use 'Resetar' nas ferramentas do sistema.")
+                st.sidebar.info("💡 Entre em contato com o administrador para resetar sua senha.")
             else:
                 st.sidebar.warning(f"⚠️ Usuário '{usuario}' não encontrado")
                 st.sidebar.info("Usuários disponíveis: " + ", ".join(usuarios.keys()))
@@ -1166,13 +1150,33 @@ def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_la
         ))
     
     fig.update_layout(
-        height=350,
-        margin=dict(l=20, r=20, t=40, b=20),
-        yaxis=dict(title='Percentual (%)', range=[0, 100], gridcolor='#f0f0f0'),
-        xaxis=dict(title='Período', gridcolor='#f0f0f0'),
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='center', x=0.5),
+        height=400,
+        margin=dict(l=20, r=20, t=50, b=20),
+        yaxis=dict(
+            title='Percentual (%)',
+            range=[0, 100],
+            gridcolor='rgba(255,255,255,0.1)',
+            title_font=dict(color='#e0e0e0'),
+            tickfont=dict(color='#e0e0e0')
+        ),
+        xaxis=dict(
+            title='Período',
+            gridcolor='rgba(255,255,255,0.05)',
+            title_font=dict(color='#e0e0e0'),
+            tickfont=dict(color='#e0e0e0')
+        ),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=-0.3,
+            xanchor='center',
+            x=0.5,
+            font=dict(color='#e0e0e0')
+        ),
         hovermode='x unified',
-        plot_bgcolor='white'
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#e0e0e0')
     )
     return fig
 
@@ -1452,6 +1456,9 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
         })
     df_tabela = pd.DataFrame(dados_tabela)
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+    
+    # ===== MUDANÇA 2: Retorna resultados para uso no relatório individual =====
+    return resultados
 
 # ============================================
 # FUNÇÕES DE RELATÓRIOS
@@ -1722,7 +1729,45 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     fig.add_trace(go.Bar(x=df_analista['mes_ano'], y=df_analista['perc_avaliacoes'], name='% Avaliações', marker_color='#3498db', opacity=0.6, yaxis='y2'))
     fig.add_trace(go.Scatter(x=df_analista['mes_ano'], y=[meta_csat]*len(df_analista), name=f'Meta CSAT: {meta_csat}%', line=dict(color='#e74c3c', width=2, dash='dash'), mode='lines'))
     fig.add_trace(go.Scatter(x=df_analista['mes_ano'], y=[meta_avaliacoes]*len(df_analista), name=f'Meta Avaliações: {meta_avaliacoes}%', line=dict(color='#f39c12', width=2, dash='dot'), mode='lines', yaxis='y2'))
-    fig.update_layout(xaxis_title='Período', yaxis=dict(title='CSAT (%)', range=[0, 100], side='left'), yaxis2=dict(title='% Avaliações', range=[0, 100], overlaying='y', side='right'), hovermode='x unified', legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1), height=450, template='plotly_white')
+    
+    fig.update_layout(
+        xaxis_title='Período',
+        xaxis=dict(
+            title_font=dict(color='#e0e0e0'),
+            tickfont=dict(color='#e0e0e0'),
+            gridcolor='rgba(255,255,255,0.05)'
+        ),
+        yaxis=dict(
+            title='CSAT (%)',
+            range=[0, 100],
+            side='left',
+            title_font=dict(color='#e0e0e0'),
+            tickfont=dict(color='#e0e0e0'),
+            gridcolor='rgba(255,255,255,0.1)'
+        ),
+        yaxis2=dict(
+            title='% Avaliações',
+            range=[0, 100],
+            overlaying='y',
+            side='right',
+            title_font=dict(color='#e0e0e0'),
+            tickfont=dict(color='#e0e0e0'),
+            gridcolor='rgba(255,255,255,0.05)'
+        ),
+        hovermode='x unified',
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=-0.3,
+            xanchor='center',
+            x=0.5,
+            font=dict(color='#e0e0e0')
+        ),
+        height=450,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#e0e0e0')
+    )
     return fig
 
 def criar_painel_analista(analista, dados, media_operacao, podio):
@@ -2085,6 +2130,49 @@ def main():
         st.header("⚙️ Gerenciar")
         if st.button("📝 Gerenciar Analistas", use_container_width=True):
             st.session_state.gerenciar_analistas = True
+        
+        # ===== MUDANÇA 1: NOVO MENU DE CONFIGURAÇÕES PARA USUÁRIOS LOGADOS =====
+        st.markdown("---")
+        st.header("⚙️ Configurações")
+        if st.button("⚙️ Configurações do Sistema", use_container_width=True):
+            st.session_state.mostrar_configuracoes = True
+    
+    # ===== MUDANÇA 1: TELA DE CONFIGURAÇÕES =====
+    if st.session_state.get('mostrar_configuracoes', False):
+        st.header("⚙️ Configurações do Sistema")
+        
+        # Renderiza as mesmas opções que estavam no expander da tela de login
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Resetar Carine", use_container_width=True):
+                resetar_usuario_carine()
+                st.rerun()
+            if st.button("🔄 Resetar Marcos", use_container_width=True):
+                resetar_usuario_marcos()
+                st.rerun()
+            if st.button("🔄 Resetar Polyana", use_container_width=True):
+                resetar_usuario_polyana()
+                st.rerun()
+            if st.button("📥 Adicionar TODOS os Analistas da Polyana", use_container_width=True):
+                adicionar_dados_teste_polyana()
+                st.rerun()
+        with col2:
+            if st.button("🧹 LIMPAR CACHE E FORÇAR PERFIL", use_container_width=True):
+                limpar_cache_completo()
+                st.rerun()
+            if st.button("👥 Gerenciar Usuários (Supabase)", use_container_width=True):
+                st.session_state.gerenciar_usuarios = True
+                st.session_state.mostrar_configuracoes = False
+                st.rerun()
+            if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
+                diagnosticar_sistema()
+        
+        st.markdown("---")
+        if st.button("🔙 Voltar", key="voltar_configuracoes"):
+            st.session_state.mostrar_configuracoes = False
+            st.rerun()
+        st.markdown("---")
+        return  # Sai da função para não renderizar o dashboard junto
     
     # ===== GERENCIAR ANALISTAS =====
     if st.session_state.get('gerenciar_analistas', False):
@@ -2157,7 +2245,7 @@ def main():
     # DASHBOARD PRINCIPAL
     # ============================================
     
-    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+    if st.session_state.get('processado', False) and not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False) and not st.session_state.get('mostrar_configuracoes', False):
         
         periodo = st.session_state.get('periodo', datetime.now().strftime('%B %Y'))
         
@@ -2186,7 +2274,11 @@ def main():
             acesso_total = True
             st.session_state.acesso_total = True
         
-        # ===== MUDANÇA 1: SELETOR DE VISÃO PARA COORDENADOR =====
+        # ===== VARIÁVEL PARA ARMAZENAR RESULTADOS DO DASHBOARD =====
+        dashboard_resultados = None
+        gestor_utilizado = gestor_ativo
+        
+        # ===== SELETOR DE VISÃO PARA COORDENADOR =====
         if acesso_total:
             # Inicializa a visão do coordenador na sessão
             if 'visao_coordenador' not in st.session_state:
@@ -2212,58 +2304,70 @@ def main():
             # Determina qual dashboard chamar
             if visao_selecionada == "🏢 Visão Geral (Toda a Operação)":
                 # Comportamento atual: coordenador vê todos
-                df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
                 st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
-                if df_historico is not None and not df_historico.empty:
-                    dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
-                else:
-                    st.warning(f"⚠️ Nenhum dado encontrado para o período {st.session_state.periodo}")
+                dashboard_resultados = dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
+                gestor_utilizado = None  # Visão geral, sem gestor específico
             else:
                 # Visão por time específico - extrai o nome do gestor da opção
                 gestor_escolhido = visao_selecionada.replace("👥 ", "")
+                gestor_utilizado = gestor_escolhido
                 st.info(f"👥 Perfil: Coordenador - Visualizando time: {gestor_escolhido}")
-                dashboard_gestor(st.session_state.periodo, gestor_escolhido, supabase)
+                dashboard_resultados = dashboard_gestor(st.session_state.periodo, gestor_escolhido, supabase)
         
         else:
             # Gestor comum (acesso_total = False)
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
-            df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo, gestor=gestor_ativo)
+            dashboard_resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
+        
+        # ===== MUDANÇA 2: RELATÓRIO INDIVIDUAL POR ANALISTA =====
+        # Verifica se o dashboard retornou resultados
+        if dashboard_resultados is not None and len(dashboard_resultados) > 0:
+            st.markdown("---")
+            st.subheader("📄 Relatório Individual por Analista")
             
-            if df_historico is not None and not df_historico.empty:
-                resultados = {}
-                for _, row in df_historico.iterrows():
-                    resultados[row['analista']] = {
-                        'total_atendimentos': row['total_atendimentos'],
-                        'total_inativos': row['total_inativos'],
-                        'validos': row['validos'],
-                        'avaliacoes': row['avaliacoes'],
-                        'positivos': row['positivos'],
-                        'negativos': row['negativos'],
-                        'perc_avaliacoes': row['perc_avaliacoes'],
-                        'perc_envio': row['perc_envio'],
-                        'csat': row['csat'],
-                        'meta_csat': row['meta_csat'],
-                        'delta_csat': row['delta_csat'],
-                        'meta_geral': row['meta_geral'],
-                        'status': row['status'],
-                        'gestor': row['gestor']
-                    }
-                
-                st.session_state.resultados = resultados
-                dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
+            # Se for visão geral (coordenador), mostra todos os analistas
+            if acesso_total and st.session_state.visao_coordenador == "🏢 Visão Geral (Toda a Operação)":
+                # Para visão geral, pega todos os analistas de todos os gestores
+                analistas_disponiveis = list(dashboard_resultados.keys())
+                # Ordena os analistas
+                analistas_disponiveis.sort()
             else:
-                st.warning(f"⚠️ Nenhum dado encontrado para {gestor_ativo} no período {st.session_state.periodo}")
-                periodos_gestor = listar_periodos(supabase, gestor_ativo)
-                if periodos_gestor:
-                    # Usa ordenar_meses para ordenação cronológica
-                    periodos_ordenados = ordenar_meses([p['mes_ano'] for p in periodos_gestor])[::-1]
-                    ultimo_periodo = periodos_ordenados[0]
-                    st.info(f"📅 Carregando último período disponível: {ultimo_periodo}")
-                    st.session_state.periodo = ultimo_periodo
-                    st.rerun()
+                # Para visão por time ou gestor comum
+                analistas_disponiveis = list(dashboard_resultados.keys())
+                analistas_disponiveis.sort()
+            
+            if analistas_disponiveis:
+                analista_selecionado = st.selectbox(
+                    "Selecione um analista para ver o relatório completo:",
+                    analistas_disponiveis,
+                    key="seletor_analista_relatorio"
+                )
+                
+                if analista_selecionado:
+                    dados_analista = dashboard_resultados[analista_selecionado]
+                    
+                    # Calcula média e pódio a partir dos resultados do dashboard
+                    media_atendimentos = calcular_media_operacao(dashboard_resultados)
+                    podio = calcular_podio(dashboard_resultados, media_atendimentos)
+                    
+                    # Determina o gestor do analista selecionado
+                    gestor_do_analista = dados_analista.get('gestor', gestor_utilizado)
+                    
+                    # Chama a função de relatório individual
+                    gerar_relatorio_individual(
+                        analista_selecionado,
+                        dados_analista,
+                        media_atendimentos,
+                        podio,
+                        st.session_state.periodo,
+                        supabase,
+                        gestor_do_analista,
+                        acesso_total
+                    )
     
     else:
-        if not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False):
+        # ===== TELA INICIAL (SEM DADOS PROCESSADOS) =====
+        if not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False) and not st.session_state.get('mostrar_configuracoes', False):
             
             # ===== GARANTE QUE O ACESSO TOTAL ESTÁ CORRETO =====
             if st.session_state.get('usuario') == 'marcos':
