@@ -2319,20 +2319,110 @@ def main():
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
             dashboard_resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
         
-        # ===== MUDANÇA 2: RELATÓRIO INDIVIDUAL POR ANALISTA =====
+        # ===== MUDANÇA: PÓDIO DO MÊS =====
         # Verifica se o dashboard retornou resultados
         if dashboard_resultados is not None and len(dashboard_resultados) > 0:
+            
+            # Calcula média e pódio a partir dos resultados do dashboard
+            media_atendimentos = calcular_media_operacao(dashboard_resultados)
+            podio = calcular_podio(dashboard_resultados, media_atendimentos)
+            
+            # ===== EXIBIÇÃO DO PÓDIO =====
+            st.markdown("---")
+            st.subheader("🏆 Pódio do Mês")
+            
+            # Verifica se há pódio manual salvo (apenas se gestor_utilizado não for None)
+            podio_manual_carregado = None
+            if gestor_utilizado is not None and supabase:
+                try:
+                    podio_manual_carregado = carregar_podio_manual(supabase, st.session_state.periodo, gestor_utilizado)
+                except:
+                    pass
+            
+            # Usa pódio manual se existir, senão usa o calculado
+            podio_exibicao = podio_manual_carregado if podio_manual_carregado is not None else podio
+            
+            # Mostra o pódio
+            if podio_exibicao and len(podio_exibicao) > 0:
+                col1, col2, col3 = st.columns(3)
+                for i, (col, (nome, csat, atendimentos, perc_avaliacoes)) in enumerate(zip([col1, col2, col3], podio_exibicao), 1):
+                    medalha = ["🥇", "🥈", "🥉"][i-1]
+                    cores = ['#FFD700', '#C0C0C0', '#CD7F32']
+                    with col:
+                        st.markdown(f"""
+                        <div style="text-align: center; padding: 20px; border: 2px solid #444; border-radius: 10px; background-color: rgba(255,255,255,0.05);">
+                            <h1 style="font-size: 48px; margin: 0;">{medalha}</h1>
+                            <h3 style="margin: 5px 0; color: #e0e0e0;">{i}º Lugar</h3>
+                            <h2 style="margin: 5px 0; color: #fff;">{nome}</h2>
+                            <p style="font-size: 24px; font-weight: bold; margin: 5px 0; color: {cores[i-1]};">{csat:.2f}%</p>
+                            <p style="margin: 5px 0; color: #ccc;">CSAT</p>
+                            <p style="margin: 5px 0; font-size: 16px; color: #aaa;">💬 {atendimentos} atendimentos</p>
+                            <p style="margin: 5px 0; font-size: 14px; color: #28a745;">{perc_avaliacoes:.2f}% avaliações</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
+            
+            # ===== EDIÇÃO MANUAL DO PÓDIO (apenas se gestor_utilizado não for None) =====
+            if gestor_utilizado is not None:
+                with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
+                    st.info("Ajuste manualmente os resultados do pódio se necessário.")
+                    
+                    # Pré-carrega valores atuais para edição
+                    podio_atual = podio_manual_carregado if podio_manual_carregado is not None else podio
+                    podio_manual_edit = []
+                    
+                    for i in range(3):
+                        col1, col2, col3 = st.columns([2, 1, 1])
+                        with col1:
+                            nome = podio_atual[i][0] if i < len(podio_atual) else ""
+                            nome_edit = st.text_input(f"{i+1}º - Nome", value=nome, key=f"podio_nome_{i}")
+                        with col2:
+                            csat = podio_atual[i][1] if i < len(podio_atual) else 0.0
+                            csat_edit = st.number_input(f"CSAT (%)", value=float(csat), key=f"podio_csat_{i}", step=0.1)
+                        with col3:
+                            atend = podio_atual[i][2] if i < len(podio_atual) else 0
+                            atend_edit = st.number_input(f"💬 Atendimentos", value=int(atend), key=f"podio_atend_{i}", step=1)
+                        if nome_edit:
+                            podio_manual_edit.append((nome_edit, csat_edit, atend_edit, 0))
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if podio_manual_edit and st.button("💾 Salvar Pódio Manual", use_container_width=True):
+                            if supabase:
+                                try:
+                                    sucesso, mensagem = salvar_podio_manual(supabase, st.session_state.periodo, gestor_utilizado, podio_manual_edit)
+                                    if sucesso:
+                                        st.success("✅ Pódio salvo com sucesso!")
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Erro: {mensagem}")
+                                except Exception as e:
+                                    st.error(f"❌ Erro: {str(e)}")
+                            else:
+                                st.error("❌ Supabase não configurado.")
+                    
+                    with col2:
+                        if st.button("🔄 Resetar Pódio", use_container_width=True):
+                            if supabase:
+                                try:
+                                    supabase.table('podio_manual').delete().eq('mes_ano', st.session_state.periodo).eq('gestor', gestor_utilizado).execute()
+                                    st.success("✅ Pódio resetado com sucesso!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro: {str(e)}")
+                            else:
+                                st.error("❌ Supabase não configurado.")
+            
+            # ===== RELATÓRIO INDIVIDUAL POR ANALISTA =====
             st.markdown("---")
             st.subheader("📄 Relatório Individual por Analista")
             
             # Se for visão geral (coordenador), mostra todos os analistas
             if acesso_total and st.session_state.visao_coordenador == "🏢 Visão Geral (Toda a Operação)":
-                # Para visão geral, pega todos os analistas de todos os gestores
                 analistas_disponiveis = list(dashboard_resultados.keys())
-                # Ordena os analistas
                 analistas_disponiveis.sort()
             else:
-                # Para visão por time ou gestor comum
                 analistas_disponiveis = list(dashboard_resultados.keys())
                 analistas_disponiveis.sort()
             
@@ -2345,10 +2435,6 @@ def main():
                 
                 if analista_selecionado:
                     dados_analista = dashboard_resultados[analista_selecionado]
-                    
-                    # Calcula média e pódio a partir dos resultados do dashboard
-                    media_atendimentos = calcular_media_operacao(dashboard_resultados)
-                    podio = calcular_podio(dashboard_resultados, media_atendimentos)
                     
                     # Determina o gestor do analista selecionado
                     gestor_do_analista = dados_analista.get('gestor', gestor_utilizado)
