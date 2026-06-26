@@ -603,6 +603,50 @@ def salvar_podio_manual(supabase, mes_ano, gestor, podio):
         return False, str(e)
 
 # ============================================
+# FUNÇÕES DE EXCLUSÃO DE ANALISTAS DO PÓDIO
+# ============================================
+
+def carregar_exclusoes_podio(supabase, mes_ano, gestor):
+    """Carrega a lista de analistas excluídos do cálculo do pódio para um mês/gestor"""
+    if not supabase:
+        return []
+    try:
+        response = supabase.table('podio_exclusoes').select('analista').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        if response.data:
+            return [item['analista'] for item in response.data]
+        return []
+    except Exception as e:
+        # Se a tabela não existir, retorna lista vazia silenciosamente
+        return []
+
+def salvar_exclusao_podio(supabase, mes_ano, gestor, analista):
+    """Insere um analista na lista de exclusões do pódio (ignora duplicidade)"""
+    if not supabase:
+        return False
+    try:
+        supabase.table('podio_exclusoes').insert({
+            'mes_ano': mes_ano,
+            'gestor': gestor,
+            'analista': analista
+        }).execute()
+        return True
+    except Exception as e:
+        # Ignora erro de duplicidade (já existe)
+        if 'duplicate key' in str(e).lower() or 'unique constraint' in str(e).lower():
+            return True
+        return False
+
+def remover_exclusao_podio(supabase, mes_ano, gestor, analista):
+    """Remove um analista da lista de exclusões do pódio"""
+    if not supabase:
+        return False
+    try:
+        supabase.table('podio_exclusoes').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).eq('analista', analista).execute()
+        return True
+    except Exception as e:
+        return False
+
+# ============================================
 # GERENCIAMENTO DE USUÁRIOS (PRIORIZA SUPABASE)
 # ============================================
 
@@ -2319,17 +2363,35 @@ def main():
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
             dashboard_resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
         
-        # ===== MUDANÇA: PÓDIO DO MÊS =====
+        # ===== MUDANÇA: PÓDIO DO MÊS (COM EXCLUSÕES) =====
         # Verifica se o dashboard retornou resultados
         if dashboard_resultados is not None and len(dashboard_resultados) > 0:
             
-            # Calcula média e pódio a partir dos resultados do dashboard
-            media_atendimentos = calcular_media_operacao(dashboard_resultados)
-            podio = calcular_podio(dashboard_resultados, media_atendimentos)
+            # ===== CARREGA EXCLUSÕES DO PÓDIO =====
+            analistas_excluidos = []
+            if gestor_utilizado is not None and supabase:
+                try:
+                    analistas_excluidos = carregar_exclusoes_podio(supabase, st.session_state.periodo, gestor_utilizado)
+                except:
+                    pass
+            
+            # ===== CRIA CÓPIA DOS RESULTADOS SEM OS EXCLUÍDOS =====
+            resultados_para_podio = {
+                k: v for k, v in dashboard_resultados.items() 
+                if k not in analistas_excluidos
+            }
+            
+            # ===== CALCULA MÉDIA E PÓDIO USANDO A CÓPIA =====
+            media_atendimentos = calcular_media_operacao(resultados_para_podio)
+            podio = calcular_podio(resultados_para_podio, media_atendimentos)
             
             # ===== EXIBIÇÃO DO PÓDIO =====
             st.markdown("---")
             st.subheader("🏆 Pódio do Mês")
+            
+            # Mostra quantos analistas foram excluídos (se houver)
+            if analistas_excluidos:
+                st.caption(f"ℹ️ {len(analistas_excluidos)} analista(s) excluído(s) do cálculo do pódio.")
             
             # Verifica se há pódio manual salvo (apenas se gestor_utilizado não for None)
             podio_manual_carregado = None
@@ -2363,9 +2425,43 @@ def main():
             else:
                 st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
             
-            # ===== EDIÇÃO MANUAL DO PÓDIO (apenas se gestor_utilizado não for None) =====
+            # ===== EDIÇÃO MANUAL DO PÓDIO E EXCLUSÕES =====
             if gestor_utilizado is not None:
                 with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
+                    
+                    # ===== SEÇÃO DE EXCLUSÃO DE ANALISTAS =====
+                    st.markdown("**Excluir analistas do cálculo do pódio:**")
+                    st.caption("Analistas com volume atípico (ex: ajuda ocasional) podem ser removidos da base de cálculo da média e elegibilidade do pódio.")
+                    
+                    # Carrega lista atual de exclusões
+                    exclusoes_atuais = carregar_exclusoes_podio(supabase, st.session_state.periodo, gestor_utilizado) if supabase else []
+                    
+                    # Multiselect para selecionar analistas a excluir
+                    analistas_selecionados = st.multiselect(
+                        "Selecione os analistas para excluir do cálculo do pódio:",
+                        options=list(dashboard_resultados.keys()),
+                        default=exclusoes_atuais,
+                        key="multiselect_exclusoes_podio"
+                    )
+                    
+                    # Verifica mudanças e aplica
+                    if set(analistas_selecionados) != set(exclusoes_atuais):
+                        # Novos selecionados (adicionar)
+                        for analista in analistas_selecionados:
+                            if analista not in exclusoes_atuais:
+                                salvar_exclusao_podio(supabase, st.session_state.periodo, gestor_utilizado, analista)
+                        
+                        # Removidos (desmarcados)
+                        for analista in exclusoes_atuais:
+                            if analista not in analistas_selecionados:
+                                remover_exclusao_podio(supabase, st.session_state.periodo, gestor_utilizado, analista)
+                        
+                        st.success("✅ Exclusões atualizadas! Recarregando...")
+                        st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # ===== EDIÇÃO MANUAL DO PÓDIO =====
                     st.info("Ajuste manualmente os resultados do pódio se necessário.")
                     
                     # Pré-carrega valores atuais para edição
