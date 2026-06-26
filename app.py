@@ -370,38 +370,65 @@ def carregar_arquivo_inativos(arquivo):
 # FUNÇÕES DE BANCO DE DADOS
 # ============================================
 
+def __tratar_erro_unique(e):
+    """Trata erro de violação de constraint UNIQUE do Supabase"""
+    erro_str = str(e).lower()
+    if 'duplicate key' in erro_str or 'unique constraint' in erro_str or '23505' in erro_str:
+        return True, "Já existe um registro para este analista neste período e gestor. Nenhum dado foi duplicado."
+    return False, None
+
 def salvar_historico(supabase, dados, mes_ano, gestor):
     if not supabase:
         return False, "Supabase não configurado"
     
     try:
-        registros = []
+        # Agrupa os analistas pelo gestor REAL (d['gestor'])
+        dados_por_gestor = {}
         for analista, d in dados.items():
-            registros.append({
-                'mes_ano': mes_ano,
-                'analista': analista,
-                'gestor': gestor,
-                'csat': d['csat'],
-                'perc_avaliacoes': d['perc_avaliacoes'],
-                'perc_envio': d['perc_envio'],
-                'total_atendimentos': d['total_atendimentos'],
-                'total_inativos': d['total_inativos'],
-                'validos': d['validos'],
-                'avaliacoes': d['avaliacoes'],
-                'positivos': d['positivos'],
-                'negativos': d['negativos'],
-                'meta_csat': d['meta_csat'],
-                'delta_csat': d['delta_csat'],
-                'meta_geral': d['meta_geral'],
-                'status': d['status']
-            })
+            gestor_real = d.get('gestor', gestor)
+            if gestor_real not in dados_por_gestor:
+                dados_por_gestor[gestor_real] = []
+            dados_por_gestor[gestor_real].append((analista, d))
         
-        existing = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
-        if existing.data:
-            return False, f"Já existe relatório para {mes_ano}"
+        # Processa cada grupo de gestor separadamente
+        for gestor_real, registros_do_gestor in dados_por_gestor.items():
+            # Verifica duplicidade para este gestor real
+            existing = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor_real).execute()
+            if existing.data:
+                return False, f"Já existe relatório para {mes_ano} do gestor {gestor_real}"
+            
+            # Insere os registros deste gestor, um por um, com verificação final
+            for analista, d in registros_do_gestor:
+                # Verificação final por registro (reduz condição de corrida)
+                existing_registro = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('analista', analista).eq('gestor', gestor_real).execute()
+                if existing_registro.data:
+                    return False, f"Já existe registro para {analista} em {mes_ano} do gestor {gestor_real}"
+                
+                try:
+                    supabase.table('historico_performance').insert({
+                        'mes_ano': mes_ano,
+                        'analista': analista,
+                        'gestor': gestor_real,
+                        'csat': d['csat'],
+                        'perc_avaliacoes': d['perc_avaliacoes'],
+                        'perc_envio': d['perc_envio'],
+                        'total_atendimentos': d['total_atendimentos'],
+                        'total_inativos': d['total_inativos'],
+                        'validos': d['validos'],
+                        'avaliacoes': d['avaliacoes'],
+                        'positivos': d['positivos'],
+                        'negativos': d['negativos'],
+                        'meta_csat': d['meta_csat'],
+                        'delta_csat': d['delta_csat'],
+                        'meta_geral': d['meta_geral'],
+                        'status': d['status']
+                    }).execute()
+                except Exception as insert_error:
+                    is_unique, msg = __tratar_erro_unique(insert_error)
+                    if is_unique:
+                        return False, f"Já existe registro para {analista} em {mes_ano} do gestor {gestor_real}. {msg}"
+                    raise insert_error
         
-        for registro in registros:
-            supabase.table('historico_performance').insert(registro).execute()
         return True, "Salvo com sucesso"
     except Exception as e:
         return False, str(e)
@@ -411,29 +438,53 @@ def substituir_historico(supabase, dados, mes_ano, gestor):
         return False, "Supabase não configurado"
     
     try:
-        supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
-        registros = []
+        # Agrupa os analistas pelo gestor REAL (d['gestor'])
+        dados_por_gestor = {}
         for analista, d in dados.items():
-            registros.append({
-                'mes_ano': mes_ano,
-                'analista': analista,
-                'gestor': gestor,
-                'csat': d['csat'],
-                'perc_avaliacoes': d['perc_avaliacoes'],
-                'perc_envio': d['perc_envio'],
-                'total_atendimentos': d['total_atendimentos'],
-                'total_inativos': d['total_inativos'],
-                'validos': d['validos'],
-                'avaliacoes': d['avaliacoes'],
-                'positivos': d['positivos'],
-                'negativos': d['negativos'],
-                'meta_csat': d['meta_csat'],
-                'delta_csat': d['delta_csat'],
-                'meta_geral': d['meta_geral'],
-                'status': d['status']
-            })
-        for registro in registros:
-            supabase.table('historico_performance').insert(registro).execute()
+            gestor_real = d.get('gestor', gestor)
+            if gestor_real not in dados_por_gestor:
+                dados_por_gestor[gestor_real] = []
+            dados_por_gestor[gestor_real].append((analista, d))
+        
+        # Processa cada grupo de gestor separadamente
+        for gestor_real, registros_do_gestor in dados_por_gestor.items():
+            # REMOVE registros existentes deste gestor e aguarda confirmação
+            try:
+                delete_result = supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor_real).execute()
+                # Verifica se o delete foi bem-sucedido (não houve erro)
+                if hasattr(delete_result, 'error') and delete_result.error:
+                    return False, f"Erro ao excluir registros antigos do gestor {gestor_real}: {delete_result.error}"
+            except Exception as delete_error:
+                return False, f"Erro ao excluir registros antigos do gestor {gestor_real}: {str(delete_error)}"
+            
+            # Só insere se o DELETE foi bem-sucedido
+            for analista, d in registros_do_gestor:
+                # Verificação final por registro antes do insert
+                try:
+                    supabase.table('historico_performance').insert({
+                        'mes_ano': mes_ano,
+                        'analista': analista,
+                        'gestor': gestor_real,
+                        'csat': d['csat'],
+                        'perc_avaliacoes': d['perc_avaliacoes'],
+                        'perc_envio': d['perc_envio'],
+                        'total_atendimentos': d['total_atendimentos'],
+                        'total_inativos': d['total_inativos'],
+                        'validos': d['validos'],
+                        'avaliacoes': d['avaliacoes'],
+                        'positivos': d['positivos'],
+                        'negativos': d['negativos'],
+                        'meta_csat': d['meta_csat'],
+                        'delta_csat': d['delta_csat'],
+                        'meta_geral': d['meta_geral'],
+                        'status': d['status']
+                    }).execute()
+                except Exception as insert_error:
+                    is_unique, msg = __tratar_erro_unique(insert_error)
+                    if is_unique:
+                        return False, f"Já existe registro para {analista} em {mes_ano} do gestor {gestor_real} (possível conflito durante substituição). {msg}"
+                    raise insert_error
+        
         return True, "Substituído com sucesso"
     except Exception as e:
         return False, str(e)
@@ -1126,6 +1177,11 @@ def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_la
     return fig
 
 def ordenar_meses(meses):
+    """
+    Ordena uma lista de strings no formato 'Mês AAAA' (ex: 'Março 2026')
+    cronologicamente por (ANO, MÊS).
+    Retorna a lista ordenada.
+    """
     ordem_meses = {
         'January': 1, 'February': 2, 'March': 3, 'April': 4,
         'May': 5, 'June': 6, 'July': 7, 'August': 8,
@@ -1134,10 +1190,22 @@ def ordenar_meses(meses):
         'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
         'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
     }
-    def get_ordem(mes):
-        nome_mes = mes.split()[0] if mes else mes
-        return ordem_meses.get(nome_mes, 13)
-    return sorted(meses, key=get_ordem)
+    
+    def extrair_ano_mes(mes_str):
+        if not mes_str:
+            return (9999, 13)
+        partes = mes_str.split()
+        if len(partes) >= 2:
+            nome_mes = partes[0]
+            try:
+                ano = int(partes[1])
+            except ValueError:
+                ano = 9999
+            numero_mes = ordem_meses.get(nome_mes, 13)
+            return (ano, numero_mes)
+        return (9999, 13)
+    
+    return sorted(meses, key=extrair_ano_mes)
 
 # ============================================
 # DASHBOARD GESTOR
@@ -1918,18 +1986,26 @@ def main():
         
         st.markdown("---")
         if st.button("🚀 Processar Dados", use_container_width=True):
-            if not periodo_valido and opcao_periodo == "Selecionar manualmente":
+            # Proteção contra duplo-clique
+            if st.session_state.get('processando', False):
+                st.warning("⏳ Processamento em andamento. Aguarde...")
+            elif not periodo_valido and opcao_periodo == "Selecionar manualmente":
                 st.error("⚠️ Selecione o período antes de processar o relatório.")
             elif not arquivo_satisfacao or not arquivo_inativos:
                 st.error("❌ Envie os dois arquivos.")
             else:
+                # Marca como processando
+                st.session_state.processando = True
+                
                 with st.spinner("Processando dados..."):
                     try:
                         df_satisfacao = carregar_arquivo_satisfacao(arquivo_satisfacao)
                         if df_satisfacao is None:
+                            st.session_state.processando = False
                             st.stop()
                         df_inativos = carregar_arquivo_inativos(arquivo_inativos)
                         if df_inativos is None:
+                            st.session_state.processando = False
                             st.stop()
                         
                         if opcao_periodo == "Extrair do arquivo":
@@ -1941,12 +2017,27 @@ def main():
                         gestor_salvar = st.session_state.get('gestor', GESTOR_MARCOS)
                         
                         if supabase:
-                            existe = verificar_periodo_existente(supabase, periodo, gestor_salvar)
-                            if existe:
-                                st.warning(f"⚠️ Já existe relatório para {periodo}.")
+                            # Verifica duplicidade para cada gestor real
+                            resultados_temp = processar_dados(df_satisfacao, df_inativos, analistas_config)
+                            dados_por_gestor = {}
+                            for analista, d in resultados_temp.items():
+                                gestor_real = d.get('gestor', gestor_salvar)
+                                if gestor_real not in dados_por_gestor:
+                                    dados_por_gestor[gestor_real] = []
+                                dados_por_gestor[gestor_real].append((analista, d))
+                            
+                            existe_duplicidade = False
+                            for gestor_real, _ in dados_por_gestor.items():
+                                if verificar_periodo_existente(supabase, periodo, gestor_real):
+                                    existe_duplicidade = True
+                                    st.warning(f"⚠️ Já existe relatório para {periodo} do gestor {gestor_real}.")
+                                    break
+                            
+                            if existe_duplicidade:
                                 col1, col2 = st.columns(2)
                                 with col1:
                                     if st.button("❌ Cancelar", use_container_width=True):
+                                        st.session_state.processando = False
                                         st.stop()
                                 with col2:
                                     if st.button("🔄 Substituir", use_container_width=True):
@@ -1958,7 +2049,9 @@ def main():
                                             st.success(f"✅ Período {periodo} substituído!")
                                         else:
                                             st.error(f"❌ Erro: {mensagem}")
+                                        st.session_state.processando = False
                                         st.rerun()
+                                st.session_state.processando = False
                                 st.stop()
                         
                         resultados = processar_dados(df_satisfacao, df_inativos, analistas_config)
@@ -1975,6 +2068,8 @@ def main():
                             st.success(f"✅ Dados processados! Período: {periodo}")
                     except Exception as e:
                         st.error(f"❌ Erro: {str(e)}")
+                    finally:
+                        st.session_state.processando = False
         
         st.markdown("---")
         st.header("📂 Gerenciar Períodos")
@@ -2016,11 +2111,16 @@ def main():
                 periodos = listar_periodos(supabase, gestor_ativo)
             
             if periodos:
+                # Ordena cronologicamente usando ordenar_meses
+                periodos_ordenados = ordenar_meses([p['mes_ano'] for p in periodos])
                 dados_tabela = []
-                for p in periodos:
-                    df_periodo = carregar_historico(supabase, mes_ano=p['mes_ano'], gestor=p['gestor'])
-                    qtd_analistas = len(df_periodo) if df_periodo is not None else 0
-                    dados_tabela.append({'Período': p['mes_ano'], 'Gestor': p['gestor'], 'Analistas': qtd_analistas})
+                for mes in periodos_ordenados:
+                    # Encontra os dados do período
+                    p = next((item for item in periodos if item['mes_ano'] == mes), None)
+                    if p:
+                        df_periodo = carregar_historico(supabase, mes_ano=p['mes_ano'], gestor=p['gestor'])
+                        qtd_analistas = len(df_periodo) if df_periodo is not None else 0
+                        dados_tabela.append({'Período': p['mes_ano'], 'Gestor': p['gestor'], 'Analistas': qtd_analistas})
                 st.dataframe(pd.DataFrame(dados_tabela), use_container_width=True, hide_index=True)
             else:
                 st.info("Nenhum período encontrado.")
@@ -2068,7 +2168,8 @@ def main():
                 periodos_disponiveis = listar_periodos(supabase, gestor_ativo)
             
             if periodos_disponiveis:
-                periodos_lista = sorted([p['mes_ano'] for p in periodos_disponiveis], reverse=True)
+                # Usa ordenar_meses para ordenação cronológica correta
+                periodos_lista = ordenar_meses([p['mes_ano'] for p in periodos_disponiveis])[::-1]  # Mais recente primeiro
                 periodo_selecionado = st.selectbox("📅 Selecione o Período para visualizar", periodos_lista, index=0 if periodo in periodos_lista else 0, key="seletor_periodo_dashboard")
                 if periodo_selecionado != periodo:
                     st.session_state.periodo = periodo_selecionado
@@ -2085,14 +2186,46 @@ def main():
             acesso_total = True
             st.session_state.acesso_total = True
         
+        # ===== MUDANÇA 1: SELETOR DE VISÃO PARA COORDENADOR =====
         if acesso_total:
-            df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
-            st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
-            if df_historico is not None and not df_historico.empty:
-                dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
+            # Inicializa a visão do coordenador na sessão
+            if 'visao_coordenador' not in st.session_state:
+                st.session_state.visao_coordenador = "🏢 Visão Geral (Toda a Operação)"
+            
+            # Cria as opções do seletor
+            opcoes_visao = ["🏢 Visão Geral (Toda a Operação)"]
+            for gestor in GESTORES_VALIDOS:
+                opcoes_visao.append(f"👥 {gestor}")
+            
+            # Seletor na interface
+            visao_selecionada = st.radio(
+                "📊 Visualizar:",
+                opcoes_visao,
+                index=opcoes_visao.index(st.session_state.visao_coordenador) if st.session_state.visao_coordenador in opcoes_visao else 0,
+                horizontal=True,
+                key="seletor_visao_coordenador"
+            )
+            
+            # Atualiza a sessão com a escolha
+            st.session_state.visao_coordenador = visao_selecionada
+            
+            # Determina qual dashboard chamar
+            if visao_selecionada == "🏢 Visão Geral (Toda a Operação)":
+                # Comportamento atual: coordenador vê todos
+                df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo)
+                st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
+                if df_historico is not None and not df_historico.empty:
+                    dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
+                else:
+                    st.warning(f"⚠️ Nenhum dado encontrado para o período {st.session_state.periodo}")
             else:
-                st.warning(f"⚠️ Nenhum dado encontrado para o período {st.session_state.periodo}")
+                # Visão por time específico - extrai o nome do gestor da opção
+                gestor_escolhido = visao_selecionada.replace("👥 ", "")
+                st.info(f"👥 Perfil: Coordenador - Visualizando time: {gestor_escolhido}")
+                dashboard_gestor(st.session_state.periodo, gestor_escolhido, supabase)
+        
         else:
+            # Gestor comum (acesso_total = False)
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
             df_historico = carregar_historico(supabase, mes_ano=st.session_state.periodo, gestor=gestor_ativo)
             
@@ -2122,10 +2255,11 @@ def main():
                 st.warning(f"⚠️ Nenhum dado encontrado para {gestor_ativo} no período {st.session_state.periodo}")
                 periodos_gestor = listar_periodos(supabase, gestor_ativo)
                 if periodos_gestor:
-                    periodos_ordenados = sorted(periodos_gestor, key=lambda x: x['mes_ano'], reverse=True)
+                    # Usa ordenar_meses para ordenação cronológica
+                    periodos_ordenados = ordenar_meses([p['mes_ano'] for p in periodos_gestor])[::-1]
                     ultimo_periodo = periodos_ordenados[0]
-                    st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
-                    st.session_state.periodo = ultimo_periodo['mes_ano']
+                    st.info(f"📅 Carregando último período disponível: {ultimo_periodo}")
+                    st.session_state.periodo = ultimo_periodo
                     st.rerun()
     
     else:
@@ -2154,34 +2288,38 @@ def main():
                     periodos = listar_periodos(supabase, gestor_ativo)
                 
                 if periodos:
-                    periodos_ordenados = sorted(periodos, key=lambda x: x['mes_ano'], reverse=True)
+                    # Usa ordenar_meses para ordenação cronológica
+                    periodos_ordenados = ordenar_meses([p['mes_ano'] for p in periodos])[::-1]
                     ultimo_periodo = periodos_ordenados[0]
-                    st.info(f"📅 Carregando último período disponível: {ultimo_periodo['mes_ano']}")
+                    st.info(f"📅 Carregando último período disponível: {ultimo_periodo}")
                     
-                    df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo['mes_ano'], gestor=ultimo_periodo['gestor'])
-                    if df_historico is not None and not df_historico.empty:
-                        resultados = {}
-                        for _, row in df_historico.iterrows():
-                            resultados[row['analista']] = {
-                                'total_atendimentos': row['total_atendimentos'],
-                                'total_inativos': row['total_inativos'],
-                                'validos': row['validos'],
-                                'avaliacoes': row['avaliacoes'],
-                                'positivos': row['positivos'],
-                                'negativos': row['negativos'],
-                                'perc_avaliacoes': row['perc_avaliacoes'],
-                                'perc_envio': row['perc_envio'],
-                                'csat': row['csat'],
-                                'meta_csat': row['meta_csat'],
-                                'delta_csat': row['delta_csat'],
-                                'meta_geral': row['meta_geral'],
-                                'status': row['status'],
-                                'gestor': row['gestor']
-                            }
-                        st.session_state.resultados = resultados
-                        st.session_state.processado = True
-                        st.session_state.periodo = ultimo_periodo['mes_ano']
-                        st.rerun()
+                    # Encontra o gestor do último período
+                    gestor_ultimo = next((p['gestor'] for p in periodos if p['mes_ano'] == ultimo_periodo), None)
+                    if gestor_ultimo:
+                        df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo, gestor=gestor_ultimo)
+                        if df_historico is not None and not df_historico.empty:
+                            resultados = {}
+                            for _, row in df_historico.iterrows():
+                                resultados[row['analista']] = {
+                                    'total_atendimentos': row['total_atendimentos'],
+                                    'total_inativos': row['total_inativos'],
+                                    'validos': row['validos'],
+                                    'avaliacoes': row['avaliacoes'],
+                                    'positivos': row['positivos'],
+                                    'negativos': row['negativos'],
+                                    'perc_avaliacoes': row['perc_avaliacoes'],
+                                    'perc_envio': row['perc_envio'],
+                                    'csat': row['csat'],
+                                    'meta_csat': row['meta_csat'],
+                                    'delta_csat': row['delta_csat'],
+                                    'meta_geral': row['meta_geral'],
+                                    'status': row['status'],
+                                    'gestor': row['gestor']
+                                }
+                            st.session_state.resultados = resultados
+                            st.session_state.processado = True
+                            st.session_state.periodo = ultimo_periodo
+                            st.rerun()
     
     st.markdown("---")
     st.markdown('<div style="text-align: center; color: #666; font-size: 12px;">Sistema de Performance v11.0 | UX Melhorado + Dashboard Visual + Evolução de Indicadores</div>', unsafe_allow_html=True)
