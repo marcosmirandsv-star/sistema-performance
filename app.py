@@ -544,6 +544,7 @@ def excluir_periodo(supabase, mes_ano, gestor):
     try:
         supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
+        supabase.table('podio_exclusoes').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         
         keys_to_remove = ['resultados', 'processado', 'periodo', 'mostrar_periodos', 'mostrar_historico']
         for key in keys_to_remove:
@@ -814,11 +815,6 @@ def fazer_login():
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔐 Login")
     
-    # ===== FERRAMENTAS DO SISTEMA REMOVIDAS DA TELA PÚBLICA =====
-    # O expander "🔧 Ferramentas do Sistema" foi completamente removido
-    # daqui por questões de segurança. Agora está disponível apenas
-    # para usuários logados em "⚙️ Configurações" na sidebar.
-    
     usuarios = carregar_usuarios()
     usuario = st.sidebar.text_input("Usuário")
     senha = st.sidebar.text_input("Senha", type="password")
@@ -846,31 +842,27 @@ def fazer_login():
                 st.sidebar.info("Usuários disponíveis: " + ", ".join(usuarios.keys()))
     
     if st.session_state.get('logado', False):
-        # Diagnóstico do perfil na sidebar
+        # ===== PERFIL DO USUÁRIO - BLOCO CONSOLIDADO =====
         st.sidebar.markdown("---")
-        st.sidebar.subheader("👤 Perfil Atual")
-        st.sidebar.write(f"**Usuário:** {st.session_state.get('usuario')}")
-        st.sidebar.write(f"**Acesso Total:** {st.session_state.get('acesso_total')}")
+        st.sidebar.subheader("👤 Perfil")
+        st.sidebar.write(f"**Usuário:** {st.session_state.get('nome_usuario')}")
         st.sidebar.write(f"**Perfil:** {st.session_state.get('perfil')}")
-        st.sidebar.write(f"**Gestor:** {st.session_state.get('gestor')}")
-        
-        if st.session_state.get('usuario') == 'marcos':
-            st.sidebar.info("👥 Deveria ver: 9 analistas (time Marcos)")
-        elif st.session_state.get('usuario') == 'polyana':
-            st.sidebar.info("👥 Deveria ver: 11 analistas (time Polyana)")
-        elif st.session_state.get('usuario') == 'carine':
-            st.sidebar.info("👥 Deveria ver: 20 analistas (todos)")
-        
-        st.sidebar.success(f"✅ Logado como {st.session_state.nome_usuario}")
-        
         if st.session_state.get('acesso_total', False):
-            st.sidebar.info("🔑 Perfil: Coordenador - Acesso Total")
+            st.sidebar.write("**Acesso:** 🔑 Total")
         else:
-            st.sidebar.info(f"👥 Perfil: Gestor - Time: {st.session_state.gestor}")
+            st.sidebar.write(f"**Time:** {st.session_state.get('gestor')}")
+        
+        st.sidebar.success(f"✅ Logado")
         
         if st.session_state.get('acesso_total', False):
             if st.sidebar.button("👤 Cadastrar Usuário", use_container_width=True):
                 st.session_state.cadastrar_usuario = True
+        
+        # ===== MENU DE CONFIGURAÇÕES NA SIDEBAR =====
+        st.sidebar.markdown("---")
+        st.sidebar.header("⚙️ Configurações")
+        if st.sidebar.button("⚙️ Configurações do Sistema", use_container_width=True):
+            st.session_state.mostrar_configuracoes = True
         
         if st.sidebar.button("Sair", use_container_width=True):
             st.session_state.logado = False
@@ -1070,8 +1062,8 @@ def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=
         st.markdown(f"""
         <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #2ecc71;">
             <p style="font-size: 14px; color: #666; margin: 0;">📊 Total de Registros</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0;">{dados.get('total_registros', 0)}</p>
-            <p style="font-size: 12px; color: #999; margin: 0;">Analistas no período</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0;">{dados.get('total_registros', 0)}</p>
+            <p style="font-size: 11px; color: #999; margin: 0;">Analistas no período</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -1080,8 +1072,8 @@ def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=
         st.markdown(f"""
         <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_csat};">
             <p style="font-size: 14px; color: #666; margin: 0;">⭐ CSAT Médio</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {cor_csat};">{dados.get('csat_medio', 0):.2f}%</p>
-            <p style="font-size: 12px; color: #999; margin: 0;">Meta: {meta_csat}%</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_csat};">{dados.get('csat_medio', 0):.2f}%</p>
+            <p style="font-size: 11px; color: #999; margin: 0;">Meta: {meta_csat}%</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -1090,8 +1082,8 @@ def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=
         st.markdown(f"""
         <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_avaliacoes};">
             <p style="font-size: 14px; color: #666; margin: 0;">📝 % Avaliações Médio</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {cor_avaliacoes};">{dados.get('perc_avaliacoes_medio', 0):.2f}%</p>
-            <p style="font-size: 12px; color: #999; margin: 0;">Meta: {meta_avaliacoes}%</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_avaliacoes};">{dados.get('perc_avaliacoes_medio', 0):.2f}%</p>
+            <p style="font-size: 11px; color: #999; margin: 0;">Meta: {meta_avaliacoes}%</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -1100,8 +1092,8 @@ def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=
         st.markdown(f"""
         <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_envio};">
             <p style="font-size: 14px; color: #666; margin: 0;">📤 % Envio Médio</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {cor_envio};">{dados.get('perc_envio_medio', 0):.2f}%</p>
-            <p style="font-size: 12px; color: #999; margin: 0;">Meta: {meta_envio}%</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_envio};">{dados.get('perc_envio_medio', 0):.2f}%</p>
+            <p style="font-size: 11px; color: #999; margin: 0;">Meta: {meta_envio}%</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1133,9 +1125,9 @@ def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta
     with col1:
         st.markdown(f"""
         <div style="background: {bg_csat}; padding: 15px; border-radius: 10px; text-align: center;">
-            <p style="font-size: 24px; margin: 0;">{cor_csat}</p>
-            <p style="font-size: 18px; font-weight: bold; margin: 0;">CSAT</p>
-            <p style="font-size: 14px; color: #333;">{csat_medio:.2f}%</p>
+            <p style="font-size: 28px; margin: 0;">{cor_csat}</p>
+            <p style="font-size: 20px; font-weight: bold; margin: 0;">CSAT</p>
+            <p style="font-size: 18px; color: #333;">{csat_medio:.2f}%</p>
             <p style="font-size: 12px; color: #666;">Status: {status_csat}</p>
             <p style="font-size: 11px; color: #999;">Meta: {meta_csat}%</p>
         </div>
@@ -1143,9 +1135,9 @@ def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta
     with col2:
         st.markdown(f"""
         <div style="background: {bg_avaliacoes}; padding: 15px; border-radius: 10px; text-align: center;">
-            <p style="font-size: 24px; margin: 0;">{cor_avaliacoes}</p>
-            <p style="font-size: 18px; font-weight: bold; margin: 0;">Avaliações</p>
-            <p style="font-size: 14px; color: #333;">{perc_avaliacoes_medio:.2f}%</p>
+            <p style="font-size: 28px; margin: 0;">{cor_avaliacoes}</p>
+            <p style="font-size: 20px; font-weight: bold; margin: 0;">Avaliações</p>
+            <p style="font-size: 18px; color: #333;">{perc_avaliacoes_medio:.2f}%</p>
             <p style="font-size: 12px; color: #666;">Status: {status_avaliacoes}</p>
             <p style="font-size: 11px; color: #999;">Meta: {meta_avaliacoes}%</p>
         </div>
@@ -1153,9 +1145,9 @@ def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta
     with col3:
         st.markdown(f"""
         <div style="background: {bg_envio}; padding: 15px; border-radius: 10px; text-align: center;">
-            <p style="font-size: 24px; margin: 0;">{cor_envio}</p>
-            <p style="font-size: 18px; font-weight: bold; margin: 0;">Envio</p>
-            <p style="font-size: 14px; color: #333;">{perc_envio_medio:.2f}%</p>
+            <p style="font-size: 28px; margin: 0;">{cor_envio}</p>
+            <p style="font-size: 20px; font-weight: bold; margin: 0;">Envio</p>
+            <p style="font-size: 18px; color: #333;">{perc_envio_medio:.2f}%</p>
             <p style="font-size: 12px; color: #666;">Status: {status_envio}</p>
             <p style="font-size: 11px; color: #999;">Meta: {meta_envio}%</p>
         </div>
@@ -1200,14 +1192,14 @@ def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_la
             title='Percentual (%)',
             range=[0, 100],
             gridcolor='rgba(255,255,255,0.1)',
-            title_font=dict(color='#e0e0e0'),
-            tickfont=dict(color='#e0e0e0')
+            title_font=dict(color='#e0e0e0', size=13),
+            tickfont=dict(color='#e0e0e0', size=12)
         ),
         xaxis=dict(
             title='Período',
             gridcolor='rgba(255,255,255,0.05)',
-            title_font=dict(color='#e0e0e0'),
-            tickfont=dict(color='#e0e0e0')
+            title_font=dict(color='#e0e0e0', size=13),
+            tickfont=dict(color='#e0e0e0', size=12)
         ),
         legend=dict(
             orientation='h',
@@ -1215,12 +1207,12 @@ def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_la
             y=-0.3,
             xanchor='center',
             x=0.5,
-            font=dict(color='#e0e0e0')
+            font=dict(color='#e0e0e0', size=12)
         ),
         hovermode='x unified',
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#e0e0e0')
+        font=dict(color='#e0e0e0', size=13)
     )
     return fig
 
@@ -1448,14 +1440,17 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
         fig_csat = criar_grafico_evolucao(df_mensal, 'csat', 'CSAT Médio - Operação', '#2ecc71', meta=meta_csat, meta_label=f'Meta: {meta_csat}%')
         if fig_csat:
             st.plotly_chart(fig_csat, use_container_width=True)
+            st.write("")
         
         fig_avaliacoes = criar_grafico_evolucao(df_mensal, 'perc_avaliacoes', '% Avaliações Médio - Operação', '#3498db', meta=meta_avaliacoes, meta_label=f'Meta: {meta_avaliacoes}%')
         if fig_avaliacoes:
             st.plotly_chart(fig_avaliacoes, use_container_width=True)
+            st.write("")
         
         fig_envio = criar_grafico_evolucao(df_mensal, 'perc_envio', '% Envio Médio - Operação', '#f39c12', meta=meta_envio, meta_label=f'Meta: {meta_envio}%')
         if fig_envio:
             st.plotly_chart(fig_envio, use_container_width=True)
+            st.write("")
     else:
         st.info("Dados insuficientes para gráficos de evolução. Importe mais meses.")
     
@@ -1501,7 +1496,6 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     df_tabela = pd.DataFrame(dados_tabela)
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
-    # ===== MUDANÇA 2: Retorna resultados para uso no relatório individual =====
     return resultados
 
 # ============================================
@@ -1777,16 +1771,16 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     fig.update_layout(
         xaxis_title='Período',
         xaxis=dict(
-            title_font=dict(color='#e0e0e0'),
-            tickfont=dict(color='#e0e0e0'),
+            title_font=dict(color='#e0e0e0', size=13),
+            tickfont=dict(color='#e0e0e0', size=12),
             gridcolor='rgba(255,255,255,0.05)'
         ),
         yaxis=dict(
             title='CSAT (%)',
             range=[0, 100],
             side='left',
-            title_font=dict(color='#e0e0e0'),
-            tickfont=dict(color='#e0e0e0'),
+            title_font=dict(color='#e0e0e0', size=13),
+            tickfont=dict(color='#e0e0e0', size=12),
             gridcolor='rgba(255,255,255,0.1)'
         ),
         yaxis2=dict(
@@ -1794,8 +1788,8 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
             range=[0, 100],
             overlaying='y',
             side='right',
-            title_font=dict(color='#e0e0e0'),
-            tickfont=dict(color='#e0e0e0'),
+            title_font=dict(color='#e0e0e0', size=13),
+            tickfont=dict(color='#e0e0e0', size=12),
             gridcolor='rgba(255,255,255,0.05)'
         ),
         hovermode='x unified',
@@ -1805,12 +1799,12 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
             y=-0.3,
             xanchor='center',
             x=0.5,
-            font=dict(color='#e0e0e0')
+            font=dict(color='#e0e0e0', size=12)
         ),
         height=450,
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#e0e0e0')
+        font=dict(color='#e0e0e0', size=13)
     )
     return fig
 
@@ -1830,8 +1824,8 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         st.markdown(f"""
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};">
             <p style="font-size: 12px; color: #666; margin: 0;">⭐ CSAT</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};">{dados['csat']:.1f}%</p>
-            <p style="font-size: 12px; color: #666; margin: 0;">Meta: {dados['meta_csat']}%</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};">{dados['csat']:.1f}%</p>
+            <p style="font-size: 11px; color: #666; margin: 0;">Meta: {dados['meta_csat']}%</p>
             <p style="font-size: 14px; color: {cor_delta}; margin: 0;">{delta_csat:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
@@ -1841,8 +1835,8 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         st.markdown(f"""
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};">
             <p style="font-size: 12px; color: #666; margin: 0;">📊 % Avaliações</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};">{dados['perc_avaliacoes']:.1f}%</p>
-            <p style="font-size: 12px; color: #666; margin: 0;">Meta: {dados['meta_geral']}%</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};">{dados['perc_avaliacoes']:.1f}%</p>
+            <p style="font-size: 11px; color: #666; margin: 0;">Meta: {dados['meta_geral']}%</p>
             <p style="font-size: 14px; color: {cor_diff}; margin: 0;">{diff_avaliacoes:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
@@ -1850,8 +1844,8 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         st.markdown(f"""
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #17a2b8;">
             <p style="font-size: 12px; color: #666; margin: 0;">📤 % Envio</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: #17a2b8;">{dados['perc_envio']:.1f}%</p>
-            <p style="font-size: 12px; color: #666; margin: 0;">Clientes não avaliaram</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: #17a2b8;">{dados['perc_envio']:.1f}%</p>
+            <p style="font-size: 11px; color: #666; margin: 0;">Clientes não avaliaram</p>
         </div>
         """, unsafe_allow_html=True)
     with col4:
@@ -1860,8 +1854,8 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         st.markdown(f"""
         <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #6c757d;">
             <p style="font-size: 12px; color: #666; margin: 0;">💬 Atendimentos</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 5px 0; color: #6c757d;">{dados['total_atendimentos']}</p>
-            <p style="font-size: 12px; color: #666; margin: 0;">Média: {media_operacao}</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: #6c757d;">{dados['total_atendimentos']}</p>
+            <p style="font-size: 11px; color: #666; margin: 0;">Média: {media_operacao}</p>
             <p style="font-size: 14px; color: {cor_atend}; margin: 0;">{diff_atend:+.0f}</p>
         </div>
         """, unsafe_allow_html=True)
@@ -1891,41 +1885,137 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
     col1, col2 = st.columns(2)
     with col1:
         fig_barras = go.Figure()
-        fig_barras.add_trace(go.Bar(x=['CSAT'], y=[dados['csat']], name='Alcançado', marker_color='#2ecc71', text=[f"{dados['csat']:.1f}%"], textposition='outside'))
-        fig_barras.add_trace(go.Bar(x=['CSAT'], y=[dados['meta_csat']], name='Meta', marker_color='#e74c3c', text=[f"{dados['meta_csat']}%"], textposition='outside'))
-        fig_barras.update_layout(title='CSAT - Resultado vs Meta', yaxis_title='Percentual (%)', yaxis_range=[0, 100], height=350, showlegend=True, legend=dict(orientation='h', yanchor='bottom', y=1.02))
+        fig_barras.add_trace(go.Bar(
+            x=['CSAT'], 
+            y=[dados['csat']], 
+            name='Alcançado', 
+            marker_color='#2ecc71', 
+            text=[f"{dados['csat']:.1f}%"], 
+            textposition='outside',
+            textfont=dict(size=14)
+        ))
+        fig_barras.add_trace(go.Bar(
+            x=['CSAT'], 
+            y=[dados['meta_csat']], 
+            name='Meta', 
+            marker_color='#e74c3c', 
+            text=[f"{dados['meta_csat']}%"], 
+            textposition='outside',
+            textfont=dict(size=14)
+        ))
+        fig_barras.update_layout(
+            title=dict(
+                text='CSAT - Resultado vs Meta',
+                font=dict(size=18, color='#e0e0e0')
+            ),
+            yaxis_title=dict(
+                text='Percentual (%)',
+                font=dict(size=14, color='#e0e0e0')
+            ),
+            yaxis=dict(
+                range=[0, 100],
+                tickfont=dict(size=12, color='#e0e0e0'),
+                gridcolor='rgba(255,255,255,0.1)'
+            ),
+            xaxis=dict(
+                tickfont=dict(size=12, color='#e0e0e0'),
+                gridcolor='rgba(255,255,255,0.05)'
+            ),
+            height=480,
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#e0e0e0', size=13)
+        )
         st.plotly_chart(fig_barras, use_container_width=True)
         
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=dados['csat'],
             delta={'reference': dados['meta_csat']},
-            title={'text': "CSAT"},
+            title={'text': "CSAT", 'font': {'size': 16, 'color': '#e0e0e0'}},
+            number={'font': {'size': 24, 'color': '#e0e0e0'}},
             gauge={
-                'axis': {'range': [None, 100]},
+                'axis': {'range': [None, 100], 'tickfont': {'size': 12, 'color': '#e0e0e0'}},
                 'bar': {'color': "#2ecc71" if dados['csat'] >= dados['meta_csat'] else "#e74c3c"},
                 'steps': [
                     {'range': [0, dados['meta_csat']], 'color': "rgba(231, 76, 60, 0.3)"},
                     {'range': [dados['meta_csat'], 100], 'color': "rgba(46, 204, 113, 0.3)"}
                 ],
-                'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': dados['meta_csat']}
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': dados['meta_csat']
+                }
             }
         ))
-        fig_gauge.update_layout(height=250)
+        fig_gauge.update_layout(
+            height=320,
+            font=dict(color='#e0e0e0', size=13),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
         st.plotly_chart(fig_gauge, use_container_width=True)
+    
     with col2:
         categorias = ['CSAT', '% Avaliações', '% Envio', 'Atendimentos']
         csat_norm = dados['csat']
         avaliacoes_norm = dados['perc_avaliacoes']
         envio_norm = dados['perc_envio']
         atend_norm = min(100, (dados['total_atendimentos'] / media_operacao) * 100) if media_operacao > 0 else 0
+        
         valores_analista = [csat_norm, avaliacoes_norm, envio_norm, atend_norm]
         valores_meta = [dados['meta_csat'], dados['meta_geral'], 50, 100]
         
         fig_radar = go.Figure()
-        fig_radar.add_trace(go.Scatterpolar(r=valores_analista, theta=categorias, fill='toself', name=analista, line_color='#2ecc71', fillcolor='rgba(46, 204, 113, 0.3)'))
-        fig_radar.add_trace(go.Scatterpolar(r=valores_meta, theta=categorias, fill='toself', name='Meta', line_color='#e74c3c', fillcolor='rgba(231, 76, 60, 0.1)', line_dash='dash'))
-        fig_radar.update_layout(title='Radar de Performance', polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=400, showlegend=True, legend=dict(orientation='h', yanchor='bottom', y=1.02))
+        fig_radar.add_trace(go.Scatterpolar(
+            r=valores_analista,
+            theta=categorias,
+            fill='toself',
+            name=analista,
+            line_color='#2ecc71',
+            fillcolor='rgba(46, 204, 113, 0.3)'
+        ))
+        fig_radar.add_trace(go.Scatterpolar(
+            r=valores_meta,
+            theta=categorias,
+            fill='toself',
+            name='Meta',
+            line_color='#e74c3c',
+            fillcolor='rgba(231, 76, 60, 0.1)',
+            line_dash='dash'
+        ))
+        fig_radar.update_layout(
+            title=dict(
+                text='Radar de Performance',
+                font=dict(size=18, color='#e0e0e0')
+            ),
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 100],
+                    tickfont=dict(size=12, color='#e0e0e0'),
+                    gridcolor='rgba(255,255,255,0.1)'
+                ),
+                angularaxis=dict(
+                    tickfont=dict(size=12, color='#e0e0e0'),
+                    gridcolor='rgba(255,255,255,0.05)'
+                )
+            ),
+            height=480,
+            showlegend=True,
+            legend=dict(
+                orientation='h',
+                yanchor='bottom',
+                y=-0.15,
+                xanchor='center',
+                x=0.5,
+                font=dict(color='#e0e0e0', size=12)
+            ),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#e0e0e0', size=13)
+        )
         st.plotly_chart(fig_radar, use_container_width=True)
     
     st.markdown("---")
@@ -2041,6 +2131,42 @@ def main():
         st.markdown("---")
         return
     
+    # ===== TELA DE CONFIGURAÇÕES =====
+    if st.session_state.get('mostrar_configuracoes', False):
+        st.header("⚙️ Configurações do Sistema")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Resetar Carine", use_container_width=True):
+                resetar_usuario_carine()
+                st.rerun()
+            if st.button("🔄 Resetar Marcos", use_container_width=True):
+                resetar_usuario_marcos()
+                st.rerun()
+            if st.button("🔄 Resetar Polyana", use_container_width=True):
+                resetar_usuario_polyana()
+                st.rerun()
+            if st.button("📥 Adicionar TODOS os Analistas da Polyana", use_container_width=True):
+                adicionar_dados_teste_polyana()
+                st.rerun()
+        with col2:
+            if st.button("🧹 LIMPAR CACHE E FORÇAR PERFIL", use_container_width=True):
+                limpar_cache_completo()
+                st.rerun()
+            if st.button("👥 Gerenciar Usuários (Supabase)", use_container_width=True):
+                st.session_state.gerenciar_usuarios = True
+                st.session_state.mostrar_configuracoes = False
+                st.rerun()
+            if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
+                diagnosticar_sistema()
+        
+        st.markdown("---")
+        if st.button("🔙 Voltar", key="voltar_configuracoes"):
+            st.session_state.mostrar_configuracoes = False
+            st.rerun()
+        st.markdown("---")
+        return
+    
     limpar_estado_sessao()
     supabase = init_supabase()
     
@@ -2075,7 +2201,6 @@ def main():
         
         st.markdown("---")
         if st.button("🚀 Processar Dados", use_container_width=True):
-            # Proteção contra duplo-clique
             if st.session_state.get('processando', False):
                 st.warning("⏳ Processamento em andamento. Aguarde...")
             elif not periodo_valido and opcao_periodo == "Selecionar manualmente":
@@ -2083,7 +2208,6 @@ def main():
             elif not arquivo_satisfacao or not arquivo_inativos:
                 st.error("❌ Envie os dois arquivos.")
             else:
-                # Marca como processando
                 st.session_state.processando = True
                 
                 with st.spinner("Processando dados..."):
@@ -2106,7 +2230,6 @@ def main():
                         gestor_salvar = st.session_state.get('gestor', GESTOR_MARCOS)
                         
                         if supabase:
-                            # Verifica duplicidade para cada gestor real
                             resultados_temp = processar_dados(df_satisfacao, df_inativos, analistas_config)
                             dados_por_gestor = {}
                             for analista, d in resultados_temp.items():
@@ -2174,49 +2297,6 @@ def main():
         st.header("⚙️ Gerenciar")
         if st.button("📝 Gerenciar Analistas", use_container_width=True):
             st.session_state.gerenciar_analistas = True
-        
-        # ===== MUDANÇA 1: NOVO MENU DE CONFIGURAÇÕES PARA USUÁRIOS LOGADOS =====
-        st.markdown("---")
-        st.header("⚙️ Configurações")
-        if st.button("⚙️ Configurações do Sistema", use_container_width=True):
-            st.session_state.mostrar_configuracoes = True
-    
-    # ===== MUDANÇA 1: TELA DE CONFIGURAÇÕES =====
-    if st.session_state.get('mostrar_configuracoes', False):
-        st.header("⚙️ Configurações do Sistema")
-        
-        # Renderiza as mesmas opções que estavam no expander da tela de login
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔄 Resetar Carine", use_container_width=True):
-                resetar_usuario_carine()
-                st.rerun()
-            if st.button("🔄 Resetar Marcos", use_container_width=True):
-                resetar_usuario_marcos()
-                st.rerun()
-            if st.button("🔄 Resetar Polyana", use_container_width=True):
-                resetar_usuario_polyana()
-                st.rerun()
-            if st.button("📥 Adicionar TODOS os Analistas da Polyana", use_container_width=True):
-                adicionar_dados_teste_polyana()
-                st.rerun()
-        with col2:
-            if st.button("🧹 LIMPAR CACHE E FORÇAR PERFIL", use_container_width=True):
-                limpar_cache_completo()
-                st.rerun()
-            if st.button("👥 Gerenciar Usuários (Supabase)", use_container_width=True):
-                st.session_state.gerenciar_usuarios = True
-                st.session_state.mostrar_configuracoes = False
-                st.rerun()
-            if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
-                diagnosticar_sistema()
-        
-        st.markdown("---")
-        if st.button("🔙 Voltar", key="voltar_configuracoes"):
-            st.session_state.mostrar_configuracoes = False
-            st.rerun()
-        st.markdown("---")
-        return  # Sai da função para não renderizar o dashboard junto
     
     # ===== GERENCIAR ANALISTAS =====
     if st.session_state.get('gerenciar_analistas', False):
@@ -2243,11 +2323,9 @@ def main():
                 periodos = listar_periodos(supabase, gestor_ativo)
             
             if periodos:
-                # Ordena cronologicamente usando ordenar_meses
                 periodos_ordenados = ordenar_meses([p['mes_ano'] for p in periodos])
                 dados_tabela = []
                 for mes in periodos_ordenados:
-                    # Encontra os dados do período
                     p = next((item for item in periodos if item['mes_ano'] == mes), None)
                     if p:
                         df_periodo = carregar_historico(supabase, mes_ano=p['mes_ano'], gestor=p['gestor'])
@@ -2300,14 +2378,12 @@ def main():
                 periodos_disponiveis = listar_periodos(supabase, gestor_ativo)
             
             if periodos_disponiveis:
-                # Usa ordenar_meses para ordenação cronológica correta
-                periodos_lista = ordenar_meses([p['mes_ano'] for p in periodos_disponiveis])[::-1]  # Mais recente primeiro
+                periodos_lista = ordenar_meses([p['mes_ano'] for p in periodos_disponiveis])[::-1]
                 periodo_selecionado = st.selectbox("📅 Selecione o Período para visualizar", periodos_lista, index=0 if periodo in periodos_lista else 0, key="seletor_periodo_dashboard")
                 if periodo_selecionado != periodo:
                     st.session_state.periodo = periodo_selecionado
                     st.rerun()
         
-        # ===== GARANTE QUE O ACESSO TOTAL ESTÁ CORRETO =====
         if st.session_state.get('usuario') == 'marcos':
             acesso_total = False
             st.session_state.acesso_total = False
@@ -2318,22 +2394,17 @@ def main():
             acesso_total = True
             st.session_state.acesso_total = True
         
-        # ===== VARIÁVEL PARA ARMAZENAR RESULTADOS DO DASHBOARD =====
         dashboard_resultados = None
         gestor_utilizado = gestor_ativo
         
-        # ===== SELETOR DE VISÃO PARA COORDENADOR =====
         if acesso_total:
-            # Inicializa a visão do coordenador na sessão
             if 'visao_coordenador' not in st.session_state:
                 st.session_state.visao_coordenador = "🏢 Visão Geral (Toda a Operação)"
             
-            # Cria as opções do seletor
             opcoes_visao = ["🏢 Visão Geral (Toda a Operação)"]
             for gestor in GESTORES_VALIDOS:
                 opcoes_visao.append(f"👥 {gestor}")
             
-            # Seletor na interface
             visao_selecionada = st.radio(
                 "📊 Visualizar:",
                 opcoes_visao,
@@ -2342,32 +2413,24 @@ def main():
                 key="seletor_visao_coordenador"
             )
             
-            # Atualiza a sessão com a escolha
             st.session_state.visao_coordenador = visao_selecionada
             
-            # Determina qual dashboard chamar
             if visao_selecionada == "🏢 Visão Geral (Toda a Operação)":
-                # Comportamento atual: coordenador vê todos
                 st.info("🔑 Perfil: Coordenador - Visualizando toda a operação")
                 dashboard_resultados = dashboard_coordenador(st.session_state.periodo, nome_usuario, supabase)
-                gestor_utilizado = None  # Visão geral, sem gestor específico
+                gestor_utilizado = None
             else:
-                # Visão por time específico - extrai o nome do gestor da opção
                 gestor_escolhido = visao_selecionada.replace("👥 ", "")
                 gestor_utilizado = gestor_escolhido
                 st.info(f"👥 Perfil: Coordenador - Visualizando time: {gestor_escolhido}")
                 dashboard_resultados = dashboard_gestor(st.session_state.periodo, gestor_escolhido, supabase)
         
         else:
-            # Gestor comum (acesso_total = False)
             st.info(f"👥 Perfil: Gestor - Visualizando equipe: {gestor_ativo}")
             dashboard_resultados = dashboard_gestor(st.session_state.periodo, gestor_ativo, supabase)
         
-        # ===== MUDANÇA: PÓDIO DO MÊS (COM EXCLUSÕES) =====
-        # Verifica se o dashboard retornou resultados
         if dashboard_resultados is not None and len(dashboard_resultados) > 0:
             
-            # ===== CARREGA EXCLUSÕES DO PÓDIO =====
             analistas_excluidos = []
             if gestor_utilizado is not None and supabase:
                 try:
@@ -2375,25 +2438,20 @@ def main():
                 except:
                     pass
             
-            # ===== CRIA CÓPIA DOS RESULTADOS SEM OS EXCLUÍDOS =====
             resultados_para_podio = {
                 k: v for k, v in dashboard_resultados.items() 
                 if k not in analistas_excluidos
             }
             
-            # ===== CALCULA MÉDIA E PÓDIO USANDO A CÓPIA =====
             media_atendimentos = calcular_media_operacao(resultados_para_podio)
             podio = calcular_podio(resultados_para_podio, media_atendimentos)
             
-            # ===== EXIBIÇÃO DO PÓDIO =====
             st.markdown("---")
             st.subheader("🏆 Pódio do Mês")
             
-            # Mostra quantos analistas foram excluídos (se houver)
             if analistas_excluidos:
                 st.caption(f"ℹ️ {len(analistas_excluidos)} analista(s) excluído(s) do cálculo do pódio.")
             
-            # Verifica se há pódio manual salvo (apenas se gestor_utilizado não for None)
             podio_manual_carregado = None
             if gestor_utilizado is not None and supabase:
                 try:
@@ -2401,13 +2459,16 @@ def main():
                 except:
                     pass
             
-            # Usa pódio manual se existir, senão usa o calculado
-            podio_exibicao = podio_manual_carregado if podio_manual_carregado is not None else podio
+            # ===== PODIO EFETIVO: usado tanto para exibição quanto para relatórios =====
+            podio_efetivo = podio_manual_carregado if podio_manual_carregado is not None else podio
             
-            # Mostra o pódio
-            if podio_exibicao and len(podio_exibicao) > 0:
+            # ===== INDICAÇÃO VISUAL DE PÓDIO MANUAL =====
+            if podio_manual_carregado is not None:
+                st.caption("✏️ Pódio ajustado manualmente pelo gestor")
+            
+            if podio_efetivo and len(podio_efetivo) > 0:
                 col1, col2, col3 = st.columns(3)
-                for i, (col, (nome, csat, atendimentos, perc_avaliacoes)) in enumerate(zip([col1, col2, col3], podio_exibicao), 1):
+                for i, (col, (nome, csat, atendimentos, perc_avaliacoes)) in enumerate(zip([col1, col2, col3], podio_efetivo), 1):
                     medalha = ["🥇", "🥈", "🥉"][i-1]
                     cores = ['#FFD700', '#C0C0C0', '#CD7F32']
                     with col:
@@ -2425,18 +2486,14 @@ def main():
             else:
                 st.info("🏆 Nenhum analista atingiu todos os critérios do pódio neste mês.")
             
-            # ===== EDIÇÃO MANUAL DO PÓDIO E EXCLUSÕES =====
             if gestor_utilizado is not None:
                 with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
                     
-                    # ===== SEÇÃO DE EXCLUSÃO DE ANALISTAS =====
                     st.markdown("**Excluir analistas do cálculo do pódio:**")
                     st.caption("Analistas com volume atípico (ex: ajuda ocasional) podem ser removidos da base de cálculo da média e elegibilidade do pódio.")
                     
-                    # Carrega lista atual de exclusões
                     exclusoes_atuais = carregar_exclusoes_podio(supabase, st.session_state.periodo, gestor_utilizado) if supabase else []
                     
-                    # Multiselect para selecionar analistas a excluir
                     analistas_selecionados = st.multiselect(
                         "Selecione os analistas para excluir do cálculo do pódio:",
                         options=list(dashboard_resultados.keys()),
@@ -2444,27 +2501,20 @@ def main():
                         key="multiselect_exclusoes_podio"
                     )
                     
-                    # Verifica mudanças e aplica
                     if set(analistas_selecionados) != set(exclusoes_atuais):
-                        # Novos selecionados (adicionar)
                         for analista in analistas_selecionados:
                             if analista not in exclusoes_atuais:
                                 salvar_exclusao_podio(supabase, st.session_state.periodo, gestor_utilizado, analista)
-                        
-                        # Removidos (desmarcados)
                         for analista in exclusoes_atuais:
                             if analista not in analistas_selecionados:
                                 remover_exclusao_podio(supabase, st.session_state.periodo, gestor_utilizado, analista)
-                        
                         st.success("✅ Exclusões atualizadas! Recarregando...")
                         st.rerun()
                     
                     st.markdown("---")
                     
-                    # ===== EDIÇÃO MANUAL DO PÓDIO =====
                     st.info("Ajuste manualmente os resultados do pódio se necessário.")
                     
-                    # Pré-carrega valores atuais para edição
                     podio_atual = podio_manual_carregado if podio_manual_carregado is not None else podio
                     podio_manual_edit = []
                     
@@ -2510,11 +2560,9 @@ def main():
                             else:
                                 st.error("❌ Supabase não configurado.")
             
-            # ===== RELATÓRIO INDIVIDUAL POR ANALISTA =====
             st.markdown("---")
             st.subheader("📄 Relatório Individual por Analista")
             
-            # Se for visão geral (coordenador), mostra todos os analistas
             if acesso_total and st.session_state.visao_coordenador == "🏢 Visão Geral (Toda a Operação)":
                 analistas_disponiveis = list(dashboard_resultados.keys())
                 analistas_disponiveis.sort()
@@ -2531,16 +2579,14 @@ def main():
                 
                 if analista_selecionado:
                     dados_analista = dashboard_resultados[analista_selecionado]
-                    
-                    # Determina o gestor do analista selecionado
                     gestor_do_analista = dados_analista.get('gestor', gestor_utilizado)
                     
-                    # Chama a função de relatório individual
+                    # ===== USAR podio_efetivo (não podio) para consistência =====
                     gerar_relatorio_individual(
                         analista_selecionado,
                         dados_analista,
                         media_atendimentos,
-                        podio,
+                        podio_efetivo,
                         st.session_state.periodo,
                         supabase,
                         gestor_do_analista,
@@ -2548,10 +2594,8 @@ def main():
                     )
     
     else:
-        # ===== TELA INICIAL (SEM DADOS PROCESSADOS) =====
         if not st.session_state.get('gerenciar_analistas', False) and not st.session_state.get('mostrar_historico', False) and not st.session_state.get('mostrar_periodos', False) and not st.session_state.get('mostrar_configuracoes', False):
             
-            # ===== GARANTE QUE O ACESSO TOTAL ESTÁ CORRETO =====
             if st.session_state.get('usuario') == 'marcos':
                 acesso_total = False
                 st.session_state.acesso_total = False
@@ -2574,12 +2618,10 @@ def main():
                     periodos = listar_periodos(supabase, gestor_ativo)
                 
                 if periodos:
-                    # Usa ordenar_meses para ordenação cronológica
                     periodos_ordenados = ordenar_meses([p['mes_ano'] for p in periodos])[::-1]
                     ultimo_periodo = periodos_ordenados[0]
                     st.info(f"📅 Carregando último período disponível: {ultimo_periodo}")
                     
-                    # Encontra o gestor do último período
                     gestor_ultimo = next((p['gestor'] for p in periodos if p['mes_ano'] == ultimo_periodo), None)
                     if gestor_ultimo:
                         df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo, gestor=gestor_ultimo)
