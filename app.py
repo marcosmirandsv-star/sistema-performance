@@ -648,6 +648,136 @@ def remover_exclusao_podio(supabase, mes_ano, gestor, analista):
         return False
 
 # ============================================
+# FUNÇÕES DE BACKUP E RESTORE
+# ============================================
+
+def gerar_backup_excel(supabase):
+    """
+    Gera um arquivo Excel com todas as abas de dados (exceto usuarios)
+    Retorna um buffer BytesIO com o arquivo Excel
+    """
+    if not supabase:
+        return None, "Supabase não configurado"
+    
+    try:
+        buffer = io.BytesIO()
+        
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            # Aba 1: historico_performance
+            response = supabase.table('historico_performance').select('*').execute()
+            df = pd.DataFrame(response.data)
+            if not df.empty:
+                # Remove coluna id (deixa o banco gerar novos na restauração)
+                df = df.drop(columns=['id'], errors='ignore')
+            df.to_excel(writer, sheet_name='historico_performance', index=False)
+            
+            # Aba 2: podio_manual
+            response = supabase.table('podio_manual').select('*').execute()
+            df = pd.DataFrame(response.data)
+            if not df.empty:
+                df = df.drop(columns=['id'], errors='ignore')
+            df.to_excel(writer, sheet_name='podio_manual', index=False)
+            
+            # Aba 3: podio_exclusoes
+            response = supabase.table('podio_exclusoes').select('*').execute()
+            df = pd.DataFrame(response.data)
+            if not df.empty:
+                df = df.drop(columns=['id'], errors='ignore')
+            df.to_excel(writer, sheet_name='podio_exclusoes', index=False)
+        
+        buffer.seek(0)
+        return buffer, "Backup gerado com sucesso!"
+    
+    except Exception as e:
+        return None, f"Erro ao gerar backup: {str(e)}"
+
+def restaurar_backup_excel(supabase, arquivo_excel, modo):
+    """
+    Restaura dados de um arquivo Excel de backup
+    modo: 'substituir' ou 'mesclar'
+    Retorna (bool, mensagem)
+    """
+    if not supabase:
+        return False, "Supabase não configurado"
+    
+    try:
+        # Lê todas as abas do Excel
+        excel_data = pd.read_excel(arquivo_excel, sheet_name=None)
+        
+        # Valida as abas esperadas
+        abas_esperadas = ['historico_performance', 'podio_manual', 'podio_exclusoes']
+        for aba in abas_esperadas:
+            if aba not in excel_data:
+                return False, f"Arquivo de backup inválido: aba '{aba}' não encontrada"
+        
+        total_restaurados = 0
+        total_pulados = 0
+        
+        # Define as chaves para verificação de duplicidade
+        chaves_unicas = {
+            'historico_performance': ['mes_ano', 'analista', 'gestor'],
+            'podio_manual': ['mes_ano', 'gestor', 'posicao'],
+            'podio_exclusoes': ['mes_ano', 'gestor', 'analista']
+        }
+        
+        for aba_nome, df in excel_data.items():
+            if df.empty:
+                continue
+            
+            # Remove a coluna id se existir
+            df = df.drop(columns=['id'], errors='ignore')
+            
+            if modo == 'substituir':
+                # Apaga todos os registros da tabela
+                try:
+                    supabase.table(aba_nome).delete().neq('id', 0).execute()
+                except Exception as e:
+                    # Se falhar, tenta deletar todos de outra forma
+                    # Busca todos os IDs e deleta um por um
+                    response = supabase.table(aba_nome).select('id').execute()
+                    for item in response.data:
+                        supabase.table(aba_nome).delete().eq('id', item['id']).execute()
+            
+            # Insere os registros
+            registros = df.to_dict('records')
+            chaves = chaves_unicas.get(aba_nome, [])
+            
+            for registro in registros:
+                if modo == 'mesclar' and chaves:
+                    # Verifica se já existe registro com a mesma chave
+                    query = supabase.table(aba_nome).select('*')
+                    for chave in chaves:
+                        if chave in registro:
+                            query = query.eq(chave, registro[chave])
+                    response = query.execute()
+                    
+                    if response.data:
+                        total_pulados += 1
+                        continue
+                
+                try:
+                    supabase.table(aba_nome).insert(registro).execute()
+                    total_restaurados += 1
+                except Exception as e:
+                    # Se falhou por duplicidade, conta como pulado
+                    is_unique, _ = __tratar_erro_unique(e)
+                    if is_unique:
+                        total_pulados += 1
+                    else:
+                        # Outro erro, repassa
+                        raise e
+        
+        if modo == 'substituir':
+            mensagem = f"Substituição concluída: {total_restaurados} registros restaurados, {total_pulados} falhas"
+        else:
+            mensagem = f"Mesclagem concluída: {total_restaurados} registros inseridos, {total_pulados} registros ignorados (já existentes)"
+        
+        return True, mensagem
+    
+    except Exception as e:
+        return False, f"Erro ao restaurar backup: {str(e)}"
+
+# ============================================
 # GERENCIAMENTO DE USUÁRIOS (PRIORIZA SUPABASE)
 # ============================================
 
@@ -2122,6 +2252,14 @@ def main():
     # ===== FORÇA O PERFIL CORRETO =====
     forcar_perfil_correto()
     
+    # ===== INICIALIZA SUPABASE ANTES DE QUALQUER USO =====
+    supabase = init_supabase()
+    
+    if supabase:
+        st.sidebar.success("✅ Conectado ao Supabase")
+    else:
+        st.sidebar.warning("⚠️ Supabase não configurado")
+    
     if st.session_state.get('cadastrar_usuario', False):
         cadastrar_usuario()
         return
@@ -2160,6 +2298,69 @@ def main():
             if st.button("🔍 Diagnóstico do Sistema", use_container_width=True):
                 diagnosticar_sistema()
         
+        # ===== BACKUP E RESTORE =====
+        st.markdown("---")
+        st.subheader("💾 Backup e Restore")
+        
+        # === BACKUP ===
+        if supabase:
+            buffer, mensagem = gerar_backup_excel(supabase)
+            if buffer:
+                data_atual = datetime.now().strftime("%Y%m%d_%H%M%S")
+                nome_arquivo = f"backup_sistema_{data_atual}.xlsx"
+                
+                st.download_button(
+                    label="📥 Baixar Backup (Excel)",
+                    data=buffer,
+                    file_name=nome_arquivo,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            else:
+                st.warning(mensagem)
+        else:
+            st.error("❌ Supabase não configurado.")
+        
+        st.markdown("---")
+        
+        # === RESTORE ===
+        st.subheader("📤 Restaurar Backup")
+        st.caption("⚠️ Restaure apenas com dados do mesmo sistema para evitar conflitos.")
+        
+        arquivo_backup = st.file_uploader(
+            "Selecione o arquivo de backup (.xlsx)",
+            type=['xlsx'],
+            key="upload_backup"
+        )
+        
+        modo_restore = st.radio(
+            "Modo de restauração:",
+            ["Mesclar (recomendado, não apaga nada)", "Substituir tudo (APAGA os dados atuais antes de restaurar)"],
+            key="modo_restore"
+        )
+        
+        confirmacao_ok = True
+        if "Substituir" in modo_restore:
+            confirmacao = st.text_input(
+                "Digite CONFIRMAR para prosseguir com a substituição:",
+                type="password",
+                key="confirmacao_substituir"
+            )
+            if confirmacao != "CONFIRMAR":
+                confirmacao_ok = False
+                st.warning("⚠️ Digite CONFIRMAR exatamente como está escrito para habilitar a restauração.")
+        
+        if arquivo_backup and confirmacao_ok:
+            if st.button("🔄 Restaurar Dados", use_container_width=True):
+                with st.spinner("Restaurando dados..."):
+                    modo = "substituir" if "Substituir" in modo_restore else "mesclar"
+                    sucesso, mensagem = restaurar_backup_excel(supabase, arquivo_backup, modo)
+                    if sucesso:
+                        st.success(f"✅ {mensagem}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {mensagem}")
+        
         st.markdown("---")
         if st.button("🔙 Voltar", key="voltar_configuracoes"):
             st.session_state.mostrar_configuracoes = False
@@ -2168,12 +2369,6 @@ def main():
         return
     
     limpar_estado_sessao()
-    supabase = init_supabase()
-    
-    if supabase:
-        st.sidebar.success("✅ Conectado ao Supabase")
-    else:
-        st.sidebar.warning("⚠️ Supabase não configurado")
     
     analistas_config = carregar_analistas()
     acesso_total = st.session_state.get('acesso_total', False)
