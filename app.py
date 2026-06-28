@@ -50,6 +50,16 @@ def init_supabase():
         return None
 
 # ============================================
+# FUNCAO DE PADRONIZACAO DE PERIODO
+# ============================================
+
+def padronizar_periodo(periodo):
+    """Padroniza o formato do periodo para 'Mes Ano'"""
+    if not periodo:
+        return periodo
+    return periodo.strip().title()
+
+# ============================================
 # FUNCOES DE FORCAGEM DE PERFIL E CACHE
 # ============================================
 
@@ -236,6 +246,10 @@ def diagnosticar_sistema():
     for gestor, config in analistas_config.items():
         st.write(f"**{gestor}** - {len(config['membros'])} analistas")
 
+# ============================================
+# GERENCIAR USUARIOS - COMPLETO
+# ============================================
+
 def gerenciar_usuarios_supabase():
     st.header("👥 Gerenciar Usuários no Supabase")
     supabase = init_supabase()
@@ -244,9 +258,11 @@ def gerenciar_usuarios_supabase():
         return
     
     try:
+        # Carrega usuarios
         response = supabase.table('usuarios').select('*').execute()
         usuarios = response.data
         
+        # ===== LISTA DE USUARIOS =====
         if usuarios:
             st.subheader("📋 Usuários Cadastrados")
             dados_tabela = []
@@ -255,9 +271,115 @@ def gerenciar_usuarios_supabase():
                     'Usuário': u['usuario'],
                     'Nome': u['nome'],
                     'Gestor': u['gestor'],
-                    'Acesso Total': '✅ Sim' if u.get('acesso_total') else '❌ Não'
+                    'Perfil': 'Coordenador' if u.get('acesso_total') else 'Gestor',
+                    'Ativo': '✅ Sim' if u.get('ativo', True) else '❌ Não'
                 })
             st.dataframe(pd.DataFrame(dados_tabela), use_container_width=True, hide_index=True)
+        
+        st.markdown("---")
+        
+        # ===== CRIAR USUARIO =====
+        st.subheader("➕ Criar Novo Usuário")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            novo_usuario = st.text_input("Usuário (login)", key="novo_usuario_login")
+            novo_nome = st.text_input("Nome completo", key="novo_usuario_nome")
+        with col2:
+            nova_senha = st.text_input("Senha", type="password", key="novo_usuario_senha")
+            confirma_senha = st.text_input("Confirmar senha", type="password", key="novo_usuario_confirma")
+        with col3:
+            novo_gestor = st.selectbox("Gestor", GESTORES_VALIDOS, key="novo_usuario_gestor")
+            novo_perfil = st.selectbox("Perfil", ["Gestor", "Coordenador"], key="novo_usuario_perfil")
+            novo_ativo = st.checkbox("Ativo", value=True, key="novo_usuario_ativo")
+        
+        if st.button("✅ Cadastrar Usuário", use_container_width=True, key="btn_criar_usuario"):
+            if not novo_usuario or not novo_nome or not nova_senha:
+                st.error("❌ Preencha todos os campos!")
+            elif novo_usuario in [u['usuario'] for u in usuarios]:
+                st.error("❌ Usuário já existe!")
+            elif nova_senha != confirma_senha:
+                st.error("❌ Senhas não conferem!")
+            elif len(nova_senha) < 6:
+                st.error("❌ Senha deve ter no mínimo 6 caracteres!")
+            else:
+                senha_hash = hash_senha(nova_senha)
+                acesso_total = True if novo_perfil == "Coordenador" else False
+                try:
+                    supabase.table('usuarios').insert({
+                        'usuario': novo_usuario,
+                        'nome': novo_nome,
+                        'senha': senha_hash,
+                        'gestor': novo_gestor,
+                        'acesso_total': acesso_total,
+                        'ativo': novo_ativo
+                    }).execute()
+                    st.success(f"✅ Usuário {novo_usuario} criado com sucesso!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erro ao criar usuário: {str(e)}")
+        
+        st.markdown("---")
+        
+        # ===== EDITAR USUARIO =====
+        st.subheader("✏️ Editar Usuário")
+        if usuarios:
+            usuario_selecionado = st.selectbox(
+                "Selecione um usuário para editar",
+                [u['usuario'] for u in usuarios],
+                key="editar_usuario_select"
+            )
+            
+            if usuario_selecionado:
+                user_data = next((u for u in usuarios if u['usuario'] == usuario_selecionado), None)
+                if user_data:
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        edit_nome = st.text_input("Nome", value=user_data['nome'], key="edit_usuario_nome")
+                        edit_gestor = st.selectbox("Gestor", GESTORES_VALIDOS, 
+                            index=GESTORES_VALIDOS.index(user_data['gestor']) if user_data['gestor'] in GESTORES_VALIDOS else 0,
+                            key="edit_usuario_gestor")
+                    with col2:
+                        edit_senha = st.text_input("Nova senha (deixe em branco para manter)", type="password", key="edit_usuario_senha")
+                        edit_confirma = st.text_input("Confirmar nova senha", type="password", key="edit_usuario_confirma")
+                    with col3:
+                        edit_perfil = st.selectbox("Perfil", ["Gestor", "Coordenador"],
+                            index=1 if user_data.get('acesso_total') else 0,
+                            key="edit_usuario_perfil")
+                        edit_ativo = st.checkbox("Ativo", value=user_data.get('ativo', True), key="edit_usuario_ativo")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        if st.button("💾 Salvar Alterações", use_container_width=True, key="btn_salvar_usuario"):
+                            updates = {
+                                'nome': edit_nome,
+                                'gestor': edit_gestor,
+                                'acesso_total': True if edit_perfil == "Coordenador" else False,
+                                'ativo': edit_ativo
+                            }
+                            if edit_senha and edit_senha == edit_confirma and len(edit_senha) >= 6:
+                                updates['senha'] = hash_senha(edit_senha)
+                            elif edit_senha and edit_senha != edit_confirma:
+                                st.error("❌ Senhas não conferem!")
+                            else:
+                                try:
+                                    supabase.table('usuarios').update(updates).eq('usuario', usuario_selecionado).execute()
+                                    st.success(f"✅ Usuário {usuario_selecionado} atualizado!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao atualizar: {str(e)}")
+                    
+                    with col2:
+                        if st.button("🗑️ Excluir Usuário", use_container_width=True, key="btn_excluir_usuario"):
+                            confirmar = st.checkbox("Confirmar exclusão permanente", key="confirmar_excluir_usuario")
+                            if confirmar:
+                                try:
+                                    supabase.table('usuarios').delete().eq('usuario', usuario_selecionado).execute()
+                                    st.success(f"✅ Usuário {usuario_selecionado} excluído!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao excluir: {str(e)}")
+                            else:
+                                st.warning("⚠️ Marque a caixa de confirmação para excluir.")
         
         st.markdown("---")
         if st.button("🔙 Voltar", key="voltar_usuarios"):
@@ -379,6 +501,9 @@ def salvar_historico(supabase, dados, mes_ano, gestor):
     if not supabase:
         return False, "Supabase não configurado"
     
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         dados_por_gestor = {}
         for analista, d in dados.items():
@@ -430,6 +555,9 @@ def substituir_historico(supabase, dados, mes_ano, gestor):
     if not supabase:
         return False, "Supabase não configurado"
     
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         dados_por_gestor = {}
         for analista, d in dados.items():
@@ -480,6 +608,10 @@ def carregar_historico(supabase, mes_ano=None, gestor=None, analista=None):
     if not supabase:
         return None
     
+    # Padroniza o periodo se fornecido
+    if mes_ano:
+        mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         query = supabase.table('historico_performance').select('*')
         if mes_ano:
@@ -528,6 +660,9 @@ def excluir_periodo(supabase, mes_ano, gestor):
     if not supabase:
         return False, "Supabase não configurado"
     
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         supabase.table('historico_performance').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
@@ -545,6 +680,10 @@ def excluir_periodo(supabase, mes_ano, gestor):
 def verificar_periodo_existente(supabase, mes_ano, gestor):
     if not supabase:
         return False
+    
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         response = supabase.table('historico_performance').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         return len(response.data) > 0
@@ -564,6 +703,10 @@ def limpar_estado_sessao():
 def carregar_podio_manual(supabase, mes_ano, gestor):
     if not supabase:
         return None
+    
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         response = supabase.table('podio_manual').select('*').eq('mes_ano', mes_ano).eq('gestor', gestor).order('posicao').execute()
         if response.data:
@@ -575,6 +718,10 @@ def carregar_podio_manual(supabase, mes_ano, gestor):
 def salvar_podio_manual(supabase, mes_ano, gestor, podio):
     if not supabase:
         return False, "Supabase não configurado"
+    
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         supabase.table('podio_manual').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         for i, (nome, csat, atendimentos, _) in enumerate(podio, 1):
@@ -593,6 +740,10 @@ def salvar_podio_manual(supabase, mes_ano, gestor, podio):
 def carregar_exclusoes_podio(supabase, mes_ano, gestor):
     if not supabase:
         return []
+    
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         response = supabase.table('podio_exclusoes').select('analista').eq('mes_ano', mes_ano).eq('gestor', gestor).execute()
         if response.data:
@@ -604,6 +755,10 @@ def carregar_exclusoes_podio(supabase, mes_ano, gestor):
 def salvar_exclusao_podio(supabase, mes_ano, gestor, analista):
     if not supabase:
         return False
+    
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         supabase.table('podio_exclusoes').insert({
             'mes_ano': mes_ano,
@@ -619,6 +774,10 @@ def salvar_exclusao_podio(supabase, mes_ano, gestor, analista):
 def remover_exclusao_podio(supabase, mes_ano, gestor, analista):
     if not supabase:
         return False
+    
+    # Padroniza o periodo
+    mes_ano = padronizar_periodo(mes_ano)
+    
     try:
         supabase.table('podio_exclusoes').delete().eq('mes_ano', mes_ano).eq('gestor', gestor).eq('analista', analista).execute()
         return True
@@ -750,7 +909,8 @@ def carregar_usuarios():
                         'senha': u['senha'],
                         'nome': u['nome'],
                         'gestor': u['gestor'],
-                        'acesso_total': u.get('acesso_total', False)
+                        'acesso_total': u.get('acesso_total', False),
+                        'ativo': u.get('ativo', True)
                     }
                 return usuarios
         except Exception as e:
@@ -768,19 +928,22 @@ def carregar_usuarios():
             "senha": hash_senha("marcos2026"),
             "nome": "Marcos Miranda",
             "gestor": GESTOR_MARCOS,
-            "acesso_total": False
+            "acesso_total": False,
+            "ativo": True
         },
         "polyana": {
             "senha": hash_senha("polyana2026"),
             "nome": "Polyana Ventura",
             "gestor": GESTOR_POLYANA,
-            "acesso_total": False
+            "acesso_total": False,
+            "ativo": True
         },
         "carine": {
             "senha": hash_senha("carine2026"),
             "nome": "Carine Melo",
             "gestor": GESTOR_MARCOS,
-            "acesso_total": True
+            "acesso_total": True,
+            "ativo": True
         }
     }
     
@@ -905,6 +1068,11 @@ def fazer_login():
     
     if st.sidebar.button("Entrar", use_container_width=True):
         if usuario in usuarios and usuarios[usuario]["senha"] == hash_senha(senha):
+            # Verifica se o usuário está ativo
+            if not usuarios[usuario].get('ativo', True):
+                st.sidebar.error("❌ Usuário desativado. Contate o administrador.")
+                return False
+            
             st.session_state.logado = True
             st.session_state.usuario = usuario
             st.session_state.nome_usuario = usuarios[usuario]["nome"]
@@ -1269,6 +1437,9 @@ def ordenar_meses(meses):
 # ============================================
 
 def dashboard_gestor(periodo, gestor_nome, supabase):
+    # Padroniza o periodo
+    periodo = padronizar_periodo(periodo)
+    
     df_historico = carregar_historico(supabase, mes_ano=periodo, gestor=gestor_nome)
     
     if df_historico is None or df_historico.empty:
@@ -1394,6 +1565,9 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
 # ============================================
 
 def dashboard_coordenador(periodo, nome_usuario, supabase):
+    # Padroniza o periodo
+    periodo = padronizar_periodo(periodo)
+    
     df_historico = carregar_historico(supabase, mes_ano=periodo)
     
     if df_historico is None or df_historico.empty:
@@ -2145,24 +2319,22 @@ def pagina_importar_periodo():
     
     st.markdown("---")
     
+    # ===== SELETORES DE MES E ANO (SUBSTITUI O TEXTO LIVRE) =====
     col1, col2 = st.columns(2)
     with col1:
-        opcao_periodo = st.radio("Como definir o período?", ["Selecionar manualmente", "Extrair do arquivo"], index=0, key="import_periodo_opcao")
-    
+        meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+        mes_selecionado = st.selectbox("Mês", meses, key="import_mes")
     with col2:
-        if opcao_periodo == "Selecionar manualmente":
-            periodo_manual = st.text_input("Informe o período", placeholder="Ex: Maio 2026", value="", key="import_periodo_manual")
-            periodo_selecionado = periodo_manual if periodo_manual else None
-        else:
-            periodo_selecionado = None
-            st.info("ℹ️ O período será extraído automaticamente do arquivo.")
+        anos = list(range(2020, 2031))
+        ano_selecionado = st.selectbox("Ano", anos, index=anos.index(2026), key="import_ano")
     
-    periodo_valido = periodo_selecionado is not None and periodo_selecionado.strip() != ""
+    # Monta o periodo padronizado
+    periodo = padronizar_periodo(f"{mes_selecionado} {ano_selecionado}")
+    st.info(f"📅 Período selecionado: **{periodo}**")
     
     if st.button("🚀 Processar Dados", use_container_width=True, key="import_processar"):
-        if not periodo_valido and opcao_periodo == "Selecionar manualmente":
-            st.error("⚠️ Selecione o período antes de processar o relatório.")
-        elif not arquivo_satisfacao or not arquivo_inativos:
+        if not arquivo_satisfacao or not arquivo_inativos:
             st.error("❌ Envie os dois arquivos.")
         else:
             with st.spinner("Processando dados..."):
@@ -2173,11 +2345,6 @@ def pagina_importar_periodo():
                     df_inativos = carregar_arquivo_inativos(arquivo_inativos)
                     if df_inativos is None:
                         st.stop()
-                    
-                    if opcao_periodo == "Extrair do arquivo":
-                        periodo = extrair_periodo(df_satisfacao)
-                    else:
-                        periodo = periodo_manual
                     
                     gestor_salvar = st.session_state.get('gestor', GESTOR_MARCOS)
                     
@@ -2371,6 +2538,7 @@ def pagina_historico():
             fig_historico.update_layout(height=400)
             st.plotly_chart(fig_historico, use_container_width=True)
             
+            # ===== GRAFICO INDIVIDUAL SO QUANDO ANALISTA SELECIONADO =====
             if analista_filtro != 'Todos':
                 st.subheader(f"📊 Evolução Mensal - {analista_filtro}")
                 df_analista = df_filtrado[df_filtrado['analista'] == analista_filtro]
@@ -2603,40 +2771,62 @@ def dashboard_principal():
     gestor_ativo = st.session_state.get('gestor', None)
     nome_usuario = st.session_state.get('nome_usuario', '')
     
-    if not st.session_state.get('processado', False):
-        if supabase:
-            if acesso_total:
-                periodos = listar_periodos(supabase)
-            else:
-                periodos = listar_periodos(supabase, gestor_ativo)
+    # ===== SELETOR DE PERIODO NO DASHBOARD =====
+    if supabase:
+        if acesso_total:
+            periodos_disponiveis = listar_periodos(supabase)
+        else:
+            periodos_disponiveis = listar_periodos(supabase, gestor_ativo)
+        
+        if periodos_disponiveis:
+            # Ordena cronologicamente
+            periodos_lista = ordenar_meses([p['mes_ano'] for p in periodos_disponiveis])[::-1]
             
-            if periodos:
-                periodos_ordenados = sorted(periodos, key=lambda x: x['mes_ano'], reverse=True)
-                ultimo_periodo = periodos_ordenados[0]
-                
-                df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo['mes_ano'], gestor=ultimo_periodo['gestor'])
-                if df_historico is not None and not df_historico.empty:
-                    resultados = {}
-                    for _, row in df_historico.iterrows():
-                        resultados[row['analista']] = {
-                            'total_atendimentos': row['total_atendimentos'],
-                            'total_inativos': row['total_inativos'],
-                            'validos': row['validos'],
-                            'avaliacoes': row['avaliacoes'],
-                            'positivos': row['positivos'],
-                            'negativos': row['negativos'],
-                            'perc_avaliacoes': row['perc_avaliacoes'],
-                            'perc_envio': row['perc_envio'],
-                            'csat': row['csat'],
-                            'meta_csat': row['meta_csat'],
-                            'delta_csat': row['delta_csat'],
-                            'meta_geral': row['meta_geral'],
-                            'status': row['status'],
-                            'gestor': row['gestor']
-                        }
-                    st.session_state.resultados = resultados
-                    st.session_state.processado = True
-                    st.session_state.periodo = ultimo_periodo['mes_ano']
+            # Define o periodo atual
+            periodo_atual = st.session_state.get('periodo', periodos_lista[0] if periodos_lista else None)
+            
+            if periodo_atual not in periodos_lista and periodos_lista:
+                periodo_atual = periodos_lista[0]
+            
+            periodo_selecionado = st.selectbox(
+                "📅 Selecione o Período para visualizar",
+                periodos_lista,
+                index=periodos_lista.index(periodo_atual) if periodo_atual in periodos_lista else 0,
+                key="seletor_periodo_dashboard_principal"
+            )
+            
+            if periodo_selecionado != periodo_atual:
+                st.session_state.periodo = periodo_selecionado
+                st.rerun()
+    
+    # Se não há dados processados, tenta carregar o último período
+    if not st.session_state.get('processado', False):
+        if supabase and periodos_disponiveis:
+            ultimo_periodo = ordenar_meses([p['mes_ano'] for p in periodos_disponiveis])[::-1][0]
+            
+            df_historico = carregar_historico(supabase, mes_ano=ultimo_periodo)
+            if df_historico is not None and not df_historico.empty:
+                resultados = {}
+                for _, row in df_historico.iterrows():
+                    resultados[row['analista']] = {
+                        'total_atendimentos': row['total_atendimentos'],
+                        'total_inativos': row['total_inativos'],
+                        'validos': row['validos'],
+                        'avaliacoes': row['avaliacoes'],
+                        'positivos': row['positivos'],
+                        'negativos': row['negativos'],
+                        'perc_avaliacoes': row['perc_avaliacoes'],
+                        'perc_envio': row['perc_envio'],
+                        'csat': row['csat'],
+                        'meta_csat': row['meta_csat'],
+                        'delta_csat': row['delta_csat'],
+                        'meta_geral': row['meta_geral'],
+                        'status': row['status'],
+                        'gestor': row['gestor']
+                    }
+                st.session_state.resultados = resultados
+                st.session_state.processado = True
+                st.session_state.periodo = ultimo_periodo
     
     if not st.session_state.get('processado', False) or not st.session_state.get('resultados'):
         st.info("📊 Nenhum dado carregado. Faça a importação de um período para visualizar o dashboard.")
