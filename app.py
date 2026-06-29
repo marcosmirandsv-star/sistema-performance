@@ -252,7 +252,7 @@ def diagnosticar_sistema():
 # ============================================
 
 def gerenciar_usuarios_supabase():
-    """Tela de gerenciamento de usuários - Correções de usabilidade"""
+    st.header("👥 Gerenciar Usuários no Supabase")
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
@@ -263,14 +263,7 @@ def gerenciar_usuarios_supabase():
         response = supabase.table('usuarios').select('*').execute()
         usuarios = response.data
         
-        # ============================================
-        # TÍTULO ÚNICO (PROBLEMA 1 - CORRIGIDO)
-        # ============================================
-        st.header("👥 Gerenciar Usuários")
-        
-        # ============================================
-        # LISTA DE USUARIOS
-        # ============================================
+        # ===== LISTA DE USUARIOS =====
         if usuarios:
             st.subheader("📋 Usuários Cadastrados")
             dados_tabela = []
@@ -286,9 +279,7 @@ def gerenciar_usuarios_supabase():
         
         st.markdown("---")
         
-        # ============================================
-        # CRIAR USUARIO
-        # ============================================
+        # ===== CRIAR USUARIO =====
         st.subheader("➕ Criar Novo Usuário")
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -330,80 +321,34 @@ def gerenciar_usuarios_supabase():
         
         st.markdown("---")
         
-        # ============================================
-        # EDITAR USUARIO (PROBLEMA 2 e 3 - CORRIGIDOS)
-        # ============================================
+        # ===== EDITAR USUARIO =====
         st.subheader("✏️ Editar Usuário")
-        
         if usuarios:
-            # ===== CHAVE PARA CONTROLAR O ESTADO DE SELEÇÃO =====
-            # Usamos uma chave única no session_state para controlar se o usuário foi selecionado
-            if 'usuario_selecionado_edit' not in st.session_state:
-                st.session_state.usuario_selecionado_edit = None
-            
-            # ===== SELECIONAR USUÁRIO (OBRIGATÓRIO) =====
-            # Criar lista de opções com "Selecione um usuário" como padrão
-            opcoes_usuario = ["🔽 Selecione um usuário..."] + [f"{u['nome']} ({u['usuario']})" for u in usuarios]
-            
-            # Determinar o índice inicial baseado no estado
-            index_inicial = 0
-            if st.session_state.usuario_selecionado_edit:
-                # Tenta encontrar o usuário na lista
-                for i, opcao in enumerate(opcoes_usuario):
-                    if opcao != "🔽 Selecione um usuário...":
-                        nome_opcao = opcao.split(" (")[0]
-                        if nome_opcao == st.session_state.usuario_selecionado_edit:
-                            index_inicial = i
-                            break
-            
             usuario_selecionado = st.selectbox(
-                "Selecione um usuário para editar:",
-                opcoes_usuario,
-                index=index_inicial,
+                "Selecione um usuário para editar",
+                [u['usuario'] for u in usuarios],
                 key="editar_usuario_select"
             )
             
-            # ===== VERIFICAR SE UM USUÁRIO FOI SELECIONADO =====
-            if usuario_selecionado and usuario_selecionado != "🔽 Selecione um usuário...":
-                # Atualizar estado da seleção
-                nome_selecionado = usuario_selecionado.split(" (")[0]
-                st.session_state.usuario_selecionado_edit = nome_selecionado
-                
-                # Encontrar o usuário na lista
-                user_data = next(
-                    (u for u in usuarios if u['nome'] == nome_selecionado), 
-                    None
-                )
-                
+            if usuario_selecionado:
+                user_data = next((u for u in usuarios if u['usuario'] == usuario_selecionado), None)
                 if user_data:
-                    # ===== EXIBIR DADOS DO USUÁRIO SELECIONADO =====
-                    st.markdown(f"**Editando:** {user_data['nome']}")
-                    st.markdown("---")
-                    
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         edit_nome = st.text_input("Nome", value=user_data['nome'], key="edit_usuario_nome")
-                        edit_gestor = st.selectbox(
-                            "Gestor", 
-                            GESTORES_VALIDOS, 
+                        edit_gestor = st.selectbox("Gestor", GESTORES_VALIDOS, 
                             index=GESTORES_VALIDOS.index(user_data['gestor']) if user_data['gestor'] in GESTORES_VALIDOS else 0,
-                            key="edit_usuario_gestor"
-                        )
+                            key="edit_usuario_gestor")
                     with col2:
                         edit_senha = st.text_input("Nova senha (deixe em branco para manter)", type="password", key="edit_usuario_senha")
                         edit_confirma = st.text_input("Confirmar nova senha", type="password", key="edit_usuario_confirma")
                     with col3:
-                        edit_perfil = st.selectbox(
-                            "Perfil", 
-                            ["Gestor", "Coordenador"],
+                        edit_perfil = st.selectbox("Perfil", ["Gestor", "Coordenador"],
                             index=1 if user_data.get('acesso_total') else 0,
-                            key="edit_usuario_perfil"
-                        )
+                            key="edit_usuario_perfil")
                         edit_ativo = st.checkbox("Ativo", value=user_data.get('ativo', True), key="edit_usuario_ativo")
                     
-                    # ===== BOTÕES DE AÇÃO =====
                     col1, col2, col3, col4 = st.columns(4)
-                    
                     with col1:
                         if st.button("💾 Salvar Alterações", use_container_width=True, key="btn_salvar_usuario"):
                             updates = {
@@ -418,8 +363,8 @@ def gerenciar_usuarios_supabase():
                                 st.error("❌ Senhas não conferem!")
                             else:
                                 try:
-                                    supabase.table('usuarios').update(updates).eq('usuario', user_data['usuario']).execute()
-                                    st.success(f"✅ Usuário {user_data['usuario']} atualizado!")
+                                    supabase.table('usuarios').update(updates).eq('usuario', usuario_selecionado).execute()
+                                    st.success(f"✅ Usuário {usuario_selecionado} atualizado!")
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Erro ao atualizar: {str(e)}")
@@ -429,33 +374,18 @@ def gerenciar_usuarios_supabase():
                             confirmar = st.checkbox("Confirmar exclusão permanente", key="confirmar_excluir_usuario")
                             if confirmar:
                                 try:
-                                    supabase.table('usuarios').delete().eq('usuario', user_data['usuario']).execute()
-                                    st.success(f"✅ Usuário {user_data['usuario']} excluído!")
-                                    # Limpar seleção após exclusão
-                                    st.session_state.usuario_selecionado_edit = None
+                                    supabase.table('usuarios').delete().eq('usuario', usuario_selecionado).execute()
+                                    st.success(f"✅ Usuário {usuario_selecionado} excluído!")
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Erro ao excluir: {str(e)}")
                             else:
                                 st.warning("⚠️ Marque a caixa de confirmação para excluir.")
-            else:
-                # ===== MENSAGEM QUANDO NENHUM USUÁRIO SELECIONADO =====
-                st.info("👆 Selecione um usuário na lista acima para editar.")
-                # Limpar estado se voltou para a opção padrão
-                st.session_state.usuario_selecionado_edit = None
         
         st.markdown("---")
-        
-        # ============================================
-        # BOTÃO VOLTAR (PROBLEMA 2 - CORRIGIDO)
-        # ============================================
         if st.button("🔙 Voltar", key="voltar_usuarios"):
-            # Limpar estado de seleção ao voltar
-            if 'usuario_selecionado_edit' in st.session_state:
-                del st.session_state.usuario_selecionado_edit
             st.session_state.gerenciar_usuarios = False
             st.rerun()
-            
     except Exception as e:
         st.error(f"❌ Erro: {str(e)}")
 
@@ -1864,63 +1794,302 @@ O volume total de atendimentos realizados pelo(a) {genero} foi de **{dados['tota
 - **Destaque:** {posicao} do mês em CSAT.
 """
 
-def gerar_feedback_manual(analista, dados, media_operacao, posicao_podio=None):
+def gerar_feedback_manual(analista, dados, media_operacao, posicao_podio=None, modo_feedback="SIARE - Desenvolvimento"):
+    """Gera feedback manual baseado no modo selecionado"""
     genero = get_genero_neutro(analista)
     texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!" if posicao_podio else ""
     
-    if dados['status'] == "🟢 Meta Superada":
-        reconhecimento = "Parabéns pelo excelente desempenho! Você tem sido um exemplo para a equipe."
-        direcionamento = "Continue mantendo este alto padrão de qualidade e compartilhe suas boas práticas com os colegas."
-    elif dados['status'] == "🟡 Atenção":
-        reconhecimento = "Seu desempenho tem sido consistente, mas há espaço para crescimento."
-        direcionamento = "Foque em melhorar os indicadores que estão abaixo da meta. Conte com o suporte da gestão."
+    if modo_feedback == "MIMO - Operacional":
+        return _gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio, genero, texto_podio)
     else:
-        reconhecimento = "Reconhecemos seu esforço, mas é necessário um plano de ação para melhorar os resultados."
-        direcionamento = "Vamos trabalhar juntos em um plano de ação focado nas áreas que precisam de desenvolvimento."
+        return _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero, texto_podio)
+
+def _gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio, genero, texto_podio):
+    """Gera feedback no formato MIMO (Operacional)"""
+    
+    # ===== 1. MANTER =====
+    if dados['status'] == "🟢 Meta Superada":
+        manter = f"Parabéns! Você manteve um excelente desempenho com CSAT de {dados['csat']:.2f}% e taxa de avaliações de {dados['perc_avaliacoes']:.2f}%."
+    elif dados['status'] == "🟡 Atenção":
+        manter = f"Manteve consistência com CSAT de {dados['csat']:.2f}% e {dados['total_atendimentos']} atendimentos realizados."
+    else:
+        manter = f"Manteve o engajamento com {dados['avaliacoes']} avaliações coletadas e {dados['total_atendimentos']} atendimentos."
+    
+    # ===== 2. MELHORAR =====
+    if dados['csat'] < dados['meta_csat']:
+        melhorar = f"Elevar o CSAT de {dados['csat']:.2f}% para atingir a meta de {dados['meta_csat']:.0f}%"
+    elif dados['perc_avaliacoes'] < dados['meta_geral']:
+        melhorar = f"Aumentar a taxa de avaliações de {dados['perc_avaliacoes']:.2f}% para alcançar {dados['meta_geral']:.0f}%"
+    else:
+        melhorar = "Buscar excelência contínua e compartilhar boas práticas com a equipe"
+    
+    # ===== 3. MOTIVO =====
+    if dados['csat'] < dados['meta_csat']:
+        motivo = f"Clientes insatisfeitos ({(100 - dados['csat']):.2f}%) podem impactar negativamente a imagem da marca. Cada ponto de CSAT faz diferença na percepção do cliente."
+    elif dados['perc_avaliacoes'] < dados['meta_geral']:
+        motivo = f"A coleta de avaliações é essencial para entender a experiência do cliente e identificar oportunidades de melhoria."
+    else:
+        motivo = f"Manter o alto padrão de atendimento fortalece a confiança dos clientes e a reputação da equipe."
+    
+    # ===== 4. ORIENTAÇÃO =====
+    if dados['csat'] < dados['meta_csat']:
+        orientacao = "1. Revisar os atendimentos com avaliações negativas\n"
+        orientacao += "2. Identificar padrões de insatisfação nos atendimentos\n"
+        orientacao += "3. Aplicar melhorias no processo de atendimento"
+    elif dados['perc_avaliacoes'] < dados['meta_geral']:
+        orientacao = "1. Oferecer a pesquisa ao final de cada atendimento\n"
+        orientacao += "2. Explicar ao cliente a importância do feedback\n"
+        orientacao += "3. Monitorar diariamente a taxa de coleta"
+    else:
+        orientacao = "1. Compartilhar boas práticas com a equipe\n"
+        orientacao += "2. Participar de treinamentos avançados\n"
+        orientacao += "3. Manter o alto padrão de atendimento"
     
     return f"""
-### 1. CONTEXTO E OBSERVAÇÃO
+### 1. MANTER
 
-No período analisado, o(a) colaborador(a) {analista} apresentou um CSAT de {dados['csat']:.2f}%, 
-com uma taxa de avaliações de {dados['perc_avaliacoes']:.2f}% e {dados['total_atendimentos']} atendimentos realizados. 
-O percentual de envio foi de {dados['perc_envio']:.2f}%. {texto_podio}
+{manter}
 
-### 2. IMPACTO
+### 2. MELHORAR
 
-O desempenho do(a) colaborador(a) impactou diretamente a experiência do cliente e os resultados da operação. 
-Com {dados['positivos']} avaliações positivas e apenas {dados['negativos']} negativas, o índice de satisfação 
-demonstra {'alta qualidade' if dados['csat'] >= 90 else 'oportunidades de melhoria'} no atendimento prestado.
+{melhorar}
 
-### 3. RECONHECIMENTO
+### 3. MOTIVO
 
-{reconhecimento}
-- CSAT {'acima' if dados['delta_csat'] >= 0 else 'próximo'} da meta estabelecida
-- {'Boa' if dados['perc_avaliacoes'] >= dados['meta_geral'] else 'Atenção à'} taxa de coleta de feedback
-- {'Produtividade' if dados['total_atendimentos'] >= media_operacao else 'Potencial para'} {'acima' if dados['total_atendimentos'] >= media_operacao else 'aumentar'} da média da operação
+{motivo}
 
-### 4. OPORTUNIDADE DE DESENVOLVIMENTO
+### 4. ORIENTAÇÃO PRÁTICA
 
-Para evoluir ainda mais, sugere-se focar em:
-- {'Manter o alto padrão de CSAT e buscar excelência contínua' if dados['csat'] >= 92 else 'Elevar o CSAT através de atendimentos mais resolutivos e personalizados'}
-- {'Continuar engajando os clientes na coleta de feedback' if dados['perc_avaliacoes'] >= dados['meta_geral'] else 'Aumentar a taxa de coleta de avaliações'}
-- {'Manter a produtividade elevada' if dados['total_atendimentos'] >= media_operacao else 'Otimizar o tempo entre atendimentos'}
-
-### 5. DIRECIONAMENTO PRÁTICO
-
-Ações recomendadas:
-1. {'Compartilhar boas práticas com a equipe' if dados['csat'] >= 92 else 'Revisar atendimentos com avaliações negativas'}
-2. {'Manter a abordagem atual de coleta de feedback' if dados['perc_avaliacoes'] >= dados['meta_geral'] else 'Implementar rotina de oferecimento da pesquisa'}
-3. Agendar conversa de alinhamento com a gestão
-
-### 6. ENCERRAMENTO MOTIVADOR
-
-Acreditamos no seu potencial de crescimento e evolução contínua! 
-O desenvolvimento individual fortalece todo o time. Continue se dedicando e contando com o apoio da gestão 
-para superar os desafios e celebrar as conquistas! 🚀
+{orientacao}
 
 ---
 **Status:** {dados['status']}
+{texto_podio}
 **Data:** {datetime.now().strftime('%d/%m/%Y')}
+"""
+
+def _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero, texto_podio):
+    """Gera feedback no formato SIARE (Desenvolvimento)"""
+    
+    # ===== 1. SITUAÇÃO =====
+    situacao = f"No período analisado, o(a) {genero} {analista} apresentou CSAT de {dados['csat']:.2f}% (meta: {dados['meta_csat']:.0f}%), "
+    situacao += f"taxa de avaliações de {dados['perc_avaliacoes']:.2f}% (meta: {dados['meta_geral']:.0f}%), "
+    situacao += f"e {dados['total_atendimentos']} atendimentos realizados. "
+    situacao += f"O percentual de envio foi de {dados['perc_envio']:.2f}%. {texto_podio}"
+    
+    # ===== 2. IMPACTO =====
+    impacto = f"O desempenho do(a) {genero} impactou diretamente a experiência do cliente e os resultados da operação. "
+    impacto += f"Com {dados['positivos']} avaliações positivas e apenas {dados['negativos']} negativas, "
+    impacto += f"o índice de satisfação demonstra "
+    if dados['csat'] >= 90:
+        impacto += "alta qualidade no atendimento prestado."
+    else:
+        impacto += "oportunidades de melhoria no atendimento prestado."
+    
+    # ===== 3. ANÁLISE =====
+    if dados['delta_csat'] > 0:
+        analise_csat = f"superou a meta em {dados['delta_csat']:.2f} pontos percentuais"
+    elif dados['delta_csat'] < 0:
+        analise_csat = f"ficou abaixo da meta em {abs(dados['delta_csat']):.2f} pontos percentuais"
+    else:
+        analise_csat = "atingiu exatamente a meta"
+    
+    diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
+    if diff_avaliacoes >= 0:
+        analise_avaliacoes = f"superou a meta de {dados['meta_geral']:.0f}% em {diff_avaliacoes:.2f} pontos percentuais"
+    else:
+        analise_avaliacoes = f"ficou abaixo da meta de {dados['meta_geral']:.0f}% em {abs(diff_avaliacoes):.2f} pontos percentuais"
+    
+    analise = f"**CSAT:** O resultado {analise_csat}.\n\n**Avaliações:** A taxa de coleta {analise_avaliacoes}."
+    
+    # ===== 4. RECOMENDAÇÃO =====
+    if dados['csat'] < dados['meta_csat']:
+        recomendacao = "1. Realizar análise aprofundada dos atendimentos negativos\n"
+        recomendacao += "2. Identificar padrões de insatisfação recorrentes\n"
+        recomendacao += "3. Participar de treinamentos específicos para áreas de melhoria"
+    elif dados['perc_avaliacoes'] < dados['meta_geral']:
+        recomendacao = "1. Revisar a abordagem de oferecimento da pesquisa\n"
+        recomendacao += "2. Treinar técnicas de engajamento para coleta de feedback\n"
+        recomendacao += "3. Criar rotina de verificação da coleta de avaliações"
+    else:
+        recomendacao = "1. Compartilhar boas práticas com a equipe\n"
+        recomendacao += "2. Buscar certificações e treinamentos avançados\n"
+        recomendacao += "3. Atuar como mentor para novos colaboradores"
+    
+    # ===== 5. EXPECTATIVA =====
+    expectativa = f"Para o próximo período, espera-se que o(a) {genero} "
+    if dados['csat'] >= dados['meta_csat']:
+        expectativa += "mantenha o CSAT acima da meta, "
+    else:
+        expectativa += f"eleve o CSAT para atingir a meta de {dados['meta_csat']:.0f}%, "
+    
+    if dados['perc_avaliacoes'] >= dados['meta_geral']:
+        expectativa += "continue com a boa taxa de avaliações, "
+    else:
+        expectativa += f"aumente a taxa de avaliações para {dados['meta_geral']:.0f}%, "
+    
+    expectativa += "e continue evoluindo seu desempenho global."
+    
+    return f"""
+### 1. SITUAÇÃO
+
+{situacao}
+
+### 2. IMPACTO
+
+{impacto}
+
+### 3. ANÁLISE
+
+{analise}
+
+### 4. RECOMENDAÇÃO
+
+{recomendacao}
+
+### 5. EXPECTATIVA
+
+{expectativa}
+
+---
+**Status:** {dados['status']}
+{texto_podio}
+**Data:** {datetime.now().strftime('%d/%m/%Y')}
+"""
+
+def gerar_feedback_ia(analista, dados, media_operacao, posicao_podio=None, feedback_editado=None, modo_feedback="SIARE - Desenvolvimento"):
+    """Gera feedback usando IA com base no modelo selecionado (MIMO ou SIARE)"""
+    genero = get_genero_neutro(analista)
+    texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!" if posicao_podio else "Não está no pódio"
+    
+    # ===== CONSTRUÇÃO DO PROMPT BASEADO NO MODO =====
+    if "MIMO" in modo_feedback:
+        prompt = _construir_prompt_mimo(analista, dados, media_operacao, genero, texto_podio, feedback_editado)
+    else:
+        prompt = _construir_prompt_siare(analista, dados, media_operacao, genero, texto_podio, feedback_editado)
+    
+    try:
+        github_token = st.secrets.get("GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
+        if github_token:
+            headers = {"Authorization": f"Bearer {github_token}", "Content-Type": "application/json"}
+            url = "https://models.inference.ai.azure.com/chat/completions"
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "system", "content": "Você é especialista em gestão de performance."}, {"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 1500
+            }
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code == 200:
+                result = response.json()
+                return result['choices'][0]['message']['content'].strip()
+        
+        # Fallback para feedback manual
+        return gerar_feedback_manual(analista, dados, media_operacao, posicao_podio, modo_feedback)
+    except Exception as e:
+        return gerar_feedback_manual(analista, dados, media_operacao, posicao_podio, modo_feedback)
+
+def _construir_prompt_mimo(analista, dados, media_operacao, genero, texto_podio, feedback_editado):
+    """Constrói prompt para o modo MIMO"""
+    
+    base_prompt = f"""
+Você é um especialista em gestão de performance e desenvolvimento de equipes de atendimento ao cliente.
+
+## DADOS DO COLABORADOR:
+- Nome: {analista}
+- Gênero: {genero}
+- CSAT: {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
+- Delta CSAT: {dados['delta_csat']:+.2f} pontos
+- % Avaliações: {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
+- % Envio: {dados['perc_envio']:.2f}%
+- Atendimentos: {dados['total_atendimentos']}
+- Média da operação: {media_operacao}
+- Avaliações: {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
+- Status: {dados['status']}
+- Posição no pódio: {texto_podio}
+
+## ESTRUTURA OBRIGATÓRIA DO FEEDBACK (MIMO - OPERACIONAL):
+### 1. MANTER (o que está bom e deve ser mantido)
+### 2. MELHORAR (o que precisa evoluir)
+### 3. MOTIVO (por que é importante melhorar)
+### 4. ORIENTAÇÃO PRÁTICA (ações concretas)
+
+## CARACTERÍSTICAS DO FEEDBACK MIMO:
+- Feedback curto e objetivo
+- Foco operacional
+- Linguagem simples e direta
+- Ações práticas e executáveis
+- Tom profissional mas acessível
+"""
+    
+    if feedback_editado:
+        return base_prompt + f"""
+## FEEDBACK ATUAL (EDITADO PELO GESTOR):
+{feedback_editado}
+
+## INSTRUÇÃO:
+Analise o feedback acima e melhore/ajuste seguindo a estrutura MIMO obrigatória.
+Gere o feedback revisado e aprimorado:
+"""
+    else:
+        return base_prompt + """
+## INSTRUÇÃO:
+Gere um feedback completo de performance seguindo a estrutura MIMO (Manter, Melhorar, Motivo, Orientação).
+O feedback deve ser curto, objetivo e focado em ações práticas.
+
+Gere o feedback:
+"""
+
+def _construir_prompt_siare(analista, dados, media_operacao, genero, texto_podio, feedback_editado):
+    """Constrói prompt para o modo SIARE"""
+    
+    base_prompt = f"""
+Você é um especialista em gestão de performance e desenvolvimento de equipes de atendimento ao cliente.
+
+## DADOS DO COLABORADOR:
+- Nome: {analista}
+- Gênero: {genero}
+- CSAT: {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
+- Delta CSAT: {dados['delta_csat']:+.2f} pontos
+- % Avaliações: {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
+- % Envio: {dados['perc_envio']:.2f}%
+- Atendimentos: {dados['total_atendimentos']}
+- Média da operação: {media_operacao}
+- Avaliações: {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
+- Status: {dados['status']}
+- Posição no pódio: {texto_podio}
+
+## ESTRUTURA OBRIGATÓRIA DO FEEDBACK (SIARE - DESENVOLVIMENTO):
+### 1. SITUAÇÃO (contexto atual do colaborador)
+### 2. IMPACTO (consequências do desempenho)
+### 3. ANÁLISE (causas e fatores do desempenho)
+### 4. RECOMENDAÇÃO (ações específicas para evolução)
+### 5. EXPECTATIVA (resultados esperados para o próximo período)
+
+## CARACTERÍSTICAS DO FEEDBACK SIARE:
+- Feedback aprofundado e estruturado
+- Foco em desenvolvimento de pessoas
+- Conexão entre comportamento e resultado
+- Linguagem profissional e construtiva
+- Visão de longo prazo
+"""
+    
+    if feedback_editado:
+        return base_prompt + f"""
+## FEEDBACK ATUAL (EDITADO PELO GESTOR):
+{feedback_editado}
+
+## INSTRUÇÃO:
+Analise o feedback acima e melhore/ajuste seguindo a estrutura SIARE obrigatória.
+Gere o feedback revisado e aprimorado:
+"""
+    else:
+        return base_prompt + """
+## INSTRUÇÃO:
+Gere um feedback completo de performance seguindo a estrutura SIARE (Situação, Impacto, Análise, Recomendação, Expectativa).
+O feedback deve ser aprofundado, construtivo e focado no desenvolvimento do colaborador.
+
+Gere o feedback:
 """
 
 def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_operacao, podio, periodo):
@@ -1978,74 +2147,13 @@ def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_opera
     return buffer
 
 # ============================================
-# GERADOR DE FEEDBACK COM IA
+# GERADOR DE FEEDBACK COM IA (COMPATIBILIDADE)
 # ============================================
 
-def gerar_feedback_ia(analista, dados, media_operacao, posicao_podio=None, feedback_editado=None):
-    genero = get_genero_neutro(analista)
-    texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!" if posicao_podio else "Não está no pódio"
-    
-    prompt_base = f"""
-Você é um especialista em gestão de performance e desenvolvimento de equipes de atendimento ao cliente.
-
-## DADOS DO COLABORADOR:
-- Nome: {analista}
-- Gênero: {genero}
-- CSAT: {dados['csat']:.2f}% (Meta: ≥ {dados['meta_csat']:.0f}%)
-- Delta CSAT: {dados['delta_csat']:+.2f} pontos
-- % Avaliações: {dados['perc_avaliacoes']:.2f}% (Meta: ≥ {dados['meta_geral']:.0f}%)
-- % Envio: {dados['perc_envio']:.2f}%
-- Atendimentos: {dados['total_atendimentos']}
-- Média da operação: {media_operacao}
-- Avaliações: {dados['avaliacoes']} ({dados['positivos']} positivas, {dados['negativos']} negativas)
-- Status: {dados['status']}
-- Posição no pódio: {texto_podio}
-
-## ESTRUTURA OBRIGATÓRIA DO FEEDBACK:
-### 1. CONTEXTO E OBSERVAÇÃO
-### 2. IMPACTO
-### 3. RECONHECIMENTO
-### 4. OPORTUNIDADE DE DESENVOLVIMENTO
-### 5. DIRECIONAMENTO PRÁTICO
-### 6. ENCERRAMENTO MOTIVADOR
-"""
-    
-    if feedback_editado:
-        prompt = prompt_base + f"""
-## FEEDBACK ATUAL (EDITADO PELO GESTOR):
-{feedback_editado}
-
-## INSTRUÇÃO:
-Analise o feedback acima e melhore/ajuste seguindo a estrutura obrigatória.
-Gere o feedback revisado e aprimorado:
-"""
-    else:
-        prompt = prompt_base + f"""
-## INSTRUÇÃO:
-Gere um feedback completo de performance seguindo a estrutura obrigatória de 6 seções.
-O feedback deve ser profissional, construtivo e motivador.
-
-Gere o feedback:
-"""
-    
-    try:
-        github_token = st.secrets.get("GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
-        if github_token:
-            headers = {"Authorization": f"Bearer {github_token}", "Content-Type": "application/json"}
-            url = "https://models.inference.ai.azure.com/chat/completions"
-            payload = {
-                "model": "gpt-4o-mini",
-                "messages": [{"role": "system", "content": "Você é especialista em gestão de performance."}, {"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 1500
-            }
-            response = requests.post(url, headers=headers, json=payload)
-            if response.status_code == 200:
-                result = response.json()
-                return result['choices'][0]['message']['content'].strip()
-        return gerar_feedback_manual(analista, dados, media_operacao, posicao_podio)
-    except Exception as e:
-        return gerar_feedback_manual(analista, dados, media_operacao, posicao_podio)
+# Mantido para compatibilidade com código existente
+def gerar_feedback_ia_old(analista, dados, media_operacao, posicao_podio=None, feedback_editado=None):
+    """Versão antiga para compatibilidade - usa SIARE como padrão"""
+    return gerar_feedback_ia(analista, dados, media_operacao, posicao_podio, feedback_editado, "SIARE - Desenvolvimento")
 
 # ============================================
 # FUNCOES DE PAINEL E GRAFICO MENSAL
@@ -2343,14 +2451,46 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
     
     with st.expander("📝 Feedback de Performance", expanded=True):
         st.subheader(f"📝 Feedback - {analista}")
-        feedback_atual = gerar_feedback_manual(analista, dados, media_operacao, posicao_podio)
-        feedback_editado = st.text_area("✏️ Edite o feedback abaixo. Após editar, clique em 'Gerar com IA' para melhorar:", value=feedback_atual, height=400, key="feedback_editor")
+        
+        # ===== SELETOR DE MODELO DE FEEDBACK =====
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            modo_feedback = st.radio(
+                "📋 Formato do Feedback:",
+                options=["SIARE - Desenvolvimento", "MIMO - Operacional"],
+                index=0,
+                horizontal=True,
+                key="modo_feedback_selector"
+            )
+        
+        # Feedback atual baseado no modo selecionado
+        feedback_atual = gerar_feedback_manual(
+            analista, 
+            dados, 
+            media_operacao, 
+            posicao_podio,
+            modo_feedback
+        )
+        
+        feedback_editado = st.text_area(
+            "✏️ Edite o feedback abaixo. Após editar, clique em 'Gerar com IA' para melhorar:",
+            value=feedback_atual,
+            height=400,
+            key="feedback_editor"
+        )
         
         col1, col2 = st.columns([1, 3])
         with col1:
             if st.button("🤖 Gerar com IA", use_container_width=True):
                 with st.spinner("Gerando feedback com IA..."):
-                    feedback_gerado = gerar_feedback_ia(analista, dados, media_operacao, posicao_podio, feedback_editado)
+                    feedback_gerado = gerar_feedback_ia(
+                        analista, 
+                        dados, 
+                        media_operacao, 
+                        posicao_podio, 
+                        feedback_editado,
+                        modo_feedback
+                    )
                     if feedback_gerado:
                         st.session_state.feedback_gerado = feedback_gerado
                         st.success("✅ Feedback gerado com IA!")
