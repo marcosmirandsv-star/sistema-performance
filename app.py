@@ -13,6 +13,7 @@ from supabase import create_client, Client
 import hashlib
 import requests
 import calendar
+import bcrypt
 
 # ============================================
 # CONSTANTES DE GESTORES (NOMES CORRETOS)
@@ -1055,42 +1056,85 @@ def salvar_analistas(analistas):
         return False
 
 # ============================================
-# LOGIN
+# FUNÇÃO DE LOGIN CORRIGIDA
 # ============================================
 
-def fazer_login():
+def fazer_login_corrigido():
+    """Versão corrigida do login usando bcrypt"""
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔐 Login")
     
-    usuarios = carregar_usuarios()
+    supabase = init_supabase()
+    if not supabase:
+        st.sidebar.error("❌ Erro de conexão com o banco")
+        return False
+    
     usuario = st.sidebar.text_input("Usuário")
     senha = st.sidebar.text_input("Senha", type="password")
     
     if st.sidebar.button("Entrar", use_container_width=True):
-        if usuario in usuarios and usuarios[usuario]["senha"] == hash_senha(senha):
-            # Verifica se o usuário está ativo
-            if not usuarios[usuario].get('ativo', True):
-                st.sidebar.error("❌ Usuário desativado. Contate o administrador.")
+        if not usuario or not senha:
+            st.sidebar.error("❌ Preencha usuário e senha!")
+            return False
+        
+        try:
+            # Buscar usuário no Supabase
+            response = supabase.table('usuarios').select('*').eq('usuario', usuario).execute()
+            
+            if not response.data:
+                st.sidebar.error("❌ Usuário não encontrado!")
                 return False
             
-            st.session_state.logado = True
-            st.session_state.usuario = usuario
-            st.session_state.nome_usuario = usuarios[usuario]["nome"]
-            st.session_state.gestor = usuarios[usuario]["gestor"]
-            st.session_state.acesso_total = usuarios[usuario].get("acesso_total", False)
-            st.session_state.perfil = "Coordenador" if st.session_state.acesso_total else "Gestor"
+            user = response.data[0]
             
-            forcar_perfil_correto()
-            st.rerun()
-        else:
-            st.sidebar.error("❌ Usuário ou senha inválidos!")
-            if usuario in usuarios:
-                st.sidebar.warning(f"⚠️ Usuário '{usuario}' existe, mas a senha está incorreta")
-                st.sidebar.info("💡 Entre em contato com o administrador para resetar sua senha.")
-            else:
-                st.sidebar.warning(f"⚠️ Usuário '{usuario}' não encontrado")
-                st.sidebar.info("Usuários disponíveis: " + ", ".join(usuarios.keys()))
+            # Verificar se está ativo
+            if not user.get('ativo', True):
+                st.sidebar.error("❌ Usuário desativado!")
+                return False
+            
+            # Verificar senha com bcrypt
+            try:
+                import bcrypt
+                senha_hash = user.get('senha', '')
+                if bcrypt.checkpw(senha.encode('utf-8'), senha_hash.encode('utf-8')):
+                    # Login bem-sucedido
+                    st.session_state.logado = True
+                    st.session_state.usuario = user['usuario']
+                    st.session_state.nome_usuario = user['nome']
+                    st.session_state.gestor = user.get('gestor', user.get('time_nome', ''))
+                    st.session_state.acesso_total = user.get('acesso_total', False)
+                    st.session_state.perfil = "Coordenador" if user.get('acesso_total', False) else "Gestor"
+                    st.session_state.cargo = user.get('cargo', '')
+                    st.session_state.time_nome = user.get('time_nome', '')
+                    st.session_state.supervisor_nome = user.get('supervisor_nome', '')
+                    
+                    # Atualizar último login
+                    try:
+                        supabase.table('usuarios').update({
+                            'ultimo_login': datetime.now().isoformat()
+                        }).eq('id', user['id']).execute()
+                    except:
+                        pass
+                    
+                    # Forçar perfil correto
+                    forcar_perfil_correto()
+                    
+                    st.sidebar.success(f"✅ Bem-vindo, {user['nome']}!")
+                    st.rerun()
+                    return True
+                else:
+                    st.sidebar.error("❌ Senha incorreta!")
+                    return False
+                    
+            except ImportError:
+                st.sidebar.error("❌ Erro ao verificar senha!")
+                return False
+                
+        except Exception as e:
+            st.sidebar.error(f"❌ Erro: {str(e)}")
+            return False
     
+    # Mostrar perfil se já estiver logado
     if st.session_state.get('logado', False):
         st.sidebar.markdown("---")
         st.sidebar.subheader("👤 Perfil")
@@ -1101,21 +1145,18 @@ def fazer_login():
         else:
             st.sidebar.write(f"**Time:** {st.session_state.get('gestor')}")
         
-        st.sidebar.success(f"✅ Logado")
+        st.sidebar.success("✅ Logado")
         
         if st.sidebar.button("Sair", use_container_width=True):
-            st.session_state.logado = False
-            st.session_state.usuario = None
-            st.session_state.nome_usuario = None
-            st.session_state.gestor = None
-            st.session_state.acesso_total = False
-            st.session_state.perfil = None
-            keys_to_clear = ['resultados', 'processado', 'periodo', 'df_historico']
+            keys_to_clear = ['logado', 'usuario', 'nome_usuario', 'gestor', 'acesso_total', 
+                           'perfil', 'cargo', 'time_nome', 'supervisor_nome', 'resultados', 
+                           'processado', 'periodo', 'df_historico']
             for key in keys_to_clear:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
         return True
+    
     return False
 
 # ============================================
@@ -3037,7 +3078,8 @@ def main():
     st.title("📊 Sistema de Performance - Relatórios Automáticos")
     st.markdown("---")
     
-    if not fazer_login():
+    # USAR A FUNÇÃO DE LOGIN CORRIGIDA
+    if not fazer_login_corrigido():
         st.info("👋 Faça login na barra lateral para acessar o sistema.")
         return
     
