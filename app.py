@@ -174,16 +174,20 @@ def login_user(username: str, password: str) -> Optional[Dict]:
             
         # Verificar senha
         if verify_password(password, user.get('senha', '')):
-            # Atualizar último login
-            supabase.table("usuarios").update({
-                "ultimo_login": datetime.now().isoformat()
-            }).eq("id", user['id']).execute()
+            # Removido: atualização de ultimo_login porque a coluna não existe
+            # supabase.table("usuarios").update({
+            #     "ultimo_login": datetime.now().isoformat()
+            # }).eq("id", user['id']).execute()
             
-            # Registrar log
-            registrar_log(user['id'], "LOGIN", f"Login realizado com sucesso - {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+            # Registrar log (opcional)
+            # registrar_log(user['id'], "LOGIN", f"Login realizado com sucesso")
             
             return user
         
+        return None
+        
+    except Exception as e:
+        st.error(f"Erro ao fazer login: {str(e)}")
         return None
         
     except Exception as e:
