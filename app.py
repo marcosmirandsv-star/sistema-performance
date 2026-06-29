@@ -252,21 +252,21 @@ def diagnosticar_sistema():
 # ============================================
 
 def gerenciar_usuarios_supabase():
-    """Tela de gerenciamento de usuários - Ajustes de usabilidade"""
+    """Tela de gerenciamento de usuários - Correções de usabilidade"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
         return
     
-    # ============================================
-    # TÍTULO ÚNICO (AJUSTE 1)
-    # ============================================
-    st.header("👥 Gerenciar Usuários")
-    
     try:
         # Carrega usuarios
         response = supabase.table('usuarios').select('*').execute()
         usuarios = response.data
+        
+        # ============================================
+        # TÍTULO ÚNICO (PROBLEMA 1 - CORRIGIDO)
+        # ============================================
+        st.header("👥 Gerenciar Usuários")
         
         # ============================================
         # LISTA DE USUARIOS
@@ -331,25 +331,43 @@ def gerenciar_usuarios_supabase():
         st.markdown("---")
         
         # ============================================
-        # EDITAR USUARIO (AJUSTES 2 e 3)
+        # EDITAR USUARIO (PROBLEMA 2 e 3 - CORRIGIDOS)
         # ============================================
         st.subheader("✏️ Editar Usuário")
         
         if usuarios:
+            # ===== CHAVE PARA CONTROLAR O ESTADO DE SELEÇÃO =====
+            # Usamos uma chave única no session_state para controlar se o usuário foi selecionado
+            if 'usuario_selecionado_edit' not in st.session_state:
+                st.session_state.usuario_selecionado_edit = None
+            
             # ===== SELECIONAR USUÁRIO (OBRIGATÓRIO) =====
             # Criar lista de opções com "Selecione um usuário" como padrão
             opcoes_usuario = ["🔽 Selecione um usuário..."] + [f"{u['nome']} ({u['usuario']})" for u in usuarios]
             
+            # Determinar o índice inicial baseado no estado
+            index_inicial = 0
+            if st.session_state.usuario_selecionado_edit:
+                # Tenta encontrar o usuário na lista
+                for i, opcao in enumerate(opcoes_usuario):
+                    if opcao != "🔽 Selecione um usuário...":
+                        nome_opcao = opcao.split(" (")[0]
+                        if nome_opcao == st.session_state.usuario_selecionado_edit:
+                            index_inicial = i
+                            break
+            
             usuario_selecionado = st.selectbox(
                 "Selecione um usuário para editar:",
                 opcoes_usuario,
+                index=index_inicial,
                 key="editar_usuario_select"
             )
             
             # ===== VERIFICAR SE UM USUÁRIO FOI SELECIONADO =====
             if usuario_selecionado and usuario_selecionado != "🔽 Selecione um usuário...":
-                # Extrair o nome do usuário da opção selecionada
+                # Atualizar estado da seleção
                 nome_selecionado = usuario_selecionado.split(" (")[0]
+                st.session_state.usuario_selecionado_edit = nome_selecionado
                 
                 # Encontrar o usuário na lista
                 user_data = next(
@@ -413,6 +431,8 @@ def gerenciar_usuarios_supabase():
                                 try:
                                     supabase.table('usuarios').delete().eq('usuario', user_data['usuario']).execute()
                                     st.success(f"✅ Usuário {user_data['usuario']} excluído!")
+                                    # Limpar seleção após exclusão
+                                    st.session_state.usuario_selecionado_edit = None
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Erro ao excluir: {str(e)}")
@@ -421,9 +441,18 @@ def gerenciar_usuarios_supabase():
             else:
                 # ===== MENSAGEM QUANDO NENHUM USUÁRIO SELECIONADO =====
                 st.info("👆 Selecione um usuário na lista acima para editar.")
+                # Limpar estado se voltou para a opção padrão
+                st.session_state.usuario_selecionado_edit = None
         
         st.markdown("---")
+        
+        # ============================================
+        # BOTÃO VOLTAR (PROBLEMA 2 - CORRIGIDO)
+        # ============================================
         if st.button("🔙 Voltar", key="voltar_usuarios"):
+            # Limpar estado de seleção ao voltar
+            if 'usuario_selecionado_edit' in st.session_state:
+                del st.session_state.usuario_selecionado_edit
             st.session_state.gerenciar_usuarios = False
             st.rerun()
             
