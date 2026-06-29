@@ -252,18 +252,25 @@ def diagnosticar_sistema():
 # ============================================
 
 def gerenciar_usuarios_supabase():
-    st.header("👥 Gerenciar Usuários no Supabase")
+    """Tela de gerenciamento de usuários - Ajustes de usabilidade"""
     supabase = init_supabase()
     if not supabase:
         st.error("❌ Supabase não conectado")
         return
+    
+    # ============================================
+    # TÍTULO ÚNICO (AJUSTE 1)
+    # ============================================
+    st.header("👥 Gerenciar Usuários")
     
     try:
         # Carrega usuarios
         response = supabase.table('usuarios').select('*').execute()
         usuarios = response.data
         
-        # ===== LISTA DE USUARIOS =====
+        # ============================================
+        # LISTA DE USUARIOS
+        # ============================================
         if usuarios:
             st.subheader("📋 Usuários Cadastrados")
             dados_tabela = []
@@ -279,7 +286,9 @@ def gerenciar_usuarios_supabase():
         
         st.markdown("---")
         
-        # ===== CRIAR USUARIO =====
+        # ============================================
+        # CRIAR USUARIO
+        # ============================================
         st.subheader("➕ Criar Novo Usuário")
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -321,34 +330,62 @@ def gerenciar_usuarios_supabase():
         
         st.markdown("---")
         
-        # ===== EDITAR USUARIO =====
+        # ============================================
+        # EDITAR USUARIO (AJUSTES 2 e 3)
+        # ============================================
         st.subheader("✏️ Editar Usuário")
+        
         if usuarios:
+            # ===== SELECIONAR USUÁRIO (OBRIGATÓRIO) =====
+            # Criar lista de opções com "Selecione um usuário" como padrão
+            opcoes_usuario = ["🔽 Selecione um usuário..."] + [f"{u['nome']} ({u['usuario']})" for u in usuarios]
+            
             usuario_selecionado = st.selectbox(
-                "Selecione um usuário para editar",
-                [u['usuario'] for u in usuarios],
+                "Selecione um usuário para editar:",
+                opcoes_usuario,
                 key="editar_usuario_select"
             )
             
-            if usuario_selecionado:
-                user_data = next((u for u in usuarios if u['usuario'] == usuario_selecionado), None)
+            # ===== VERIFICAR SE UM USUÁRIO FOI SELECIONADO =====
+            if usuario_selecionado and usuario_selecionado != "🔽 Selecione um usuário...":
+                # Extrair o nome do usuário da opção selecionada
+                nome_selecionado = usuario_selecionado.split(" (")[0]
+                
+                # Encontrar o usuário na lista
+                user_data = next(
+                    (u for u in usuarios if u['nome'] == nome_selecionado), 
+                    None
+                )
+                
                 if user_data:
+                    # ===== EXIBIR DADOS DO USUÁRIO SELECIONADO =====
+                    st.markdown(f"**Editando:** {user_data['nome']}")
+                    st.markdown("---")
+                    
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         edit_nome = st.text_input("Nome", value=user_data['nome'], key="edit_usuario_nome")
-                        edit_gestor = st.selectbox("Gestor", GESTORES_VALIDOS, 
+                        edit_gestor = st.selectbox(
+                            "Gestor", 
+                            GESTORES_VALIDOS, 
                             index=GESTORES_VALIDOS.index(user_data['gestor']) if user_data['gestor'] in GESTORES_VALIDOS else 0,
-                            key="edit_usuario_gestor")
+                            key="edit_usuario_gestor"
+                        )
                     with col2:
                         edit_senha = st.text_input("Nova senha (deixe em branco para manter)", type="password", key="edit_usuario_senha")
                         edit_confirma = st.text_input("Confirmar nova senha", type="password", key="edit_usuario_confirma")
                     with col3:
-                        edit_perfil = st.selectbox("Perfil", ["Gestor", "Coordenador"],
+                        edit_perfil = st.selectbox(
+                            "Perfil", 
+                            ["Gestor", "Coordenador"],
                             index=1 if user_data.get('acesso_total') else 0,
-                            key="edit_usuario_perfil")
+                            key="edit_usuario_perfil"
+                        )
                         edit_ativo = st.checkbox("Ativo", value=user_data.get('ativo', True), key="edit_usuario_ativo")
                     
+                    # ===== BOTÕES DE AÇÃO =====
                     col1, col2, col3, col4 = st.columns(4)
+                    
                     with col1:
                         if st.button("💾 Salvar Alterações", use_container_width=True, key="btn_salvar_usuario"):
                             updates = {
@@ -363,8 +400,8 @@ def gerenciar_usuarios_supabase():
                                 st.error("❌ Senhas não conferem!")
                             else:
                                 try:
-                                    supabase.table('usuarios').update(updates).eq('usuario', usuario_selecionado).execute()
-                                    st.success(f"✅ Usuário {usuario_selecionado} atualizado!")
+                                    supabase.table('usuarios').update(updates).eq('usuario', user_data['usuario']).execute()
+                                    st.success(f"✅ Usuário {user_data['usuario']} atualizado!")
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Erro ao atualizar: {str(e)}")
@@ -374,18 +411,22 @@ def gerenciar_usuarios_supabase():
                             confirmar = st.checkbox("Confirmar exclusão permanente", key="confirmar_excluir_usuario")
                             if confirmar:
                                 try:
-                                    supabase.table('usuarios').delete().eq('usuario', usuario_selecionado).execute()
-                                    st.success(f"✅ Usuário {usuario_selecionado} excluído!")
+                                    supabase.table('usuarios').delete().eq('usuario', user_data['usuario']).execute()
+                                    st.success(f"✅ Usuário {user_data['usuario']} excluído!")
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ Erro ao excluir: {str(e)}")
                             else:
                                 st.warning("⚠️ Marque a caixa de confirmação para excluir.")
+            else:
+                # ===== MENSAGEM QUANDO NENHUM USUÁRIO SELECIONADO =====
+                st.info("👆 Selecione um usuário na lista acima para editar.")
         
         st.markdown("---")
         if st.button("🔙 Voltar", key="voltar_usuarios"):
             st.session_state.gerenciar_usuarios = False
             st.rerun()
+            
     except Exception as e:
         st.error(f"❌ Erro: {str(e)}")
 
