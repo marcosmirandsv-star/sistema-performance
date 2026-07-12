@@ -1369,7 +1369,7 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "👥 Analistas",
             dados.get('total_registros', 0),
-            "-",
+            "-",                     # meta (sem prefixo)
             "Total na equipe",
             "#2ecc71"
         )
@@ -1379,7 +1379,7 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "⭐ CSAT",
             f"{dados.get('csat_medio', 0):.1f}%",
-            f"Meta: {meta_csat}%",
+            f"{meta_csat}%",         # apenas o valor, sem "Meta:"
             "✅" if dados.get('csat_medio', 0) >= meta_csat else "⚠️",
             cor_csat
         )
@@ -1389,7 +1389,7 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "📝 Avaliações",
             f"{dados.get('perc_avaliacoes_medio', 0):.1f}%",
-            f"Meta: {meta_avaliacoes}%",
+            f"{meta_avaliacoes}%",   # apenas o valor
             "✅" if dados.get('perc_avaliacoes_medio', 0) >= meta_avaliacoes else "⚠️",
             cor_avaliacoes
         )
@@ -1399,11 +1399,10 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "📤 Envio",
             f"{dados.get('perc_envio_medio', 0):.1f}%",
-            f"Meta: {meta_envio}%",
+            f"{meta_envio}%",        # apenas o valor
             "✅" if dados.get('perc_envio_medio', 0) >= meta_envio else "⚠️",
             cor_envio
         )
-
 def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_envio_medio, 
                                     metas_superadas, total_analistas):
     col1, col2, col3, col4 = st.columns(4)
@@ -1425,7 +1424,7 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
         criar_card_compacto(
             "⭐ CSAT",
             f"{saude_csat} {csat_medio:.1f}%",
-            "Meta: 90%",
+            "90%",      # meta sem prefixo
             "Status",
             "#2ecc71" if csat_medio >= 90 else "#f39c12" if csat_medio >= 85 else "#e74c3c"
         )
@@ -1434,7 +1433,7 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
         criar_card_compacto(
             "📝 Avaliações",
             f"{saude_avaliacoes} {perc_avaliacoes_medio:.1f}%",
-            "Meta: 25%",
+            "25%",      # meta sem prefixo
             "Status",
             "#2ecc71" if perc_avaliacoes_medio >= 25 else "#f39c12" if perc_avaliacoes_medio >= 20 else "#e74c3c"
         )
@@ -1443,7 +1442,7 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
         criar_card_compacto(
             "📤 Envio",
             f"{saude_envio} {perc_envio_medio:.1f}%",
-            "Meta: 80%",
+            "80%",      # meta sem prefixo
             "Status",
             "#2ecc71" if perc_envio_medio >= 80 else "#f39c12" if perc_envio_medio >= 70 else "#e74c3c"
         )
