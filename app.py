@@ -1933,40 +1933,33 @@ def criar_radar_impactante(analista, dados):
     categorias = ['⭐ CSAT', '📝 Avaliações', '📤 Envio']
     valores = [dados['csat'], dados['perc_avaliacoes'], dados['perc_envio']]
     metas = [dados['meta_csat'], dados['meta_geral'], 80]
-    
+
     fig = go.Figure()
-    
+
     fig.add_trace(go.Scatterpolar(
         r=valores,
         theta=categorias,
         fill='toself',
         name=analista,
-        line=dict(
-            color='#00E676',
-            width=4
-        ),
+        line=dict(color='#00E676', width=4),
         fillcolor='rgba(0, 230, 118, 0.35)',
         hovertemplate='<b>%{theta}</b><br>%{r:.1f}%<extra></extra>'
     ))
-    
+
     fig.add_trace(go.Scatterpolar(
         r=metas,
         theta=categorias,
         fill='toself',
         name='Meta',
-        line=dict(
-            color='#FF1744',
-            width=4,
-            dash='dash'
-        ),
+        line=dict(color='#FF1744', width=4, dash='dash'),
         fillcolor='rgba(255, 23, 68, 0.15)',
         hovertemplate='<b>%{theta}</b><br>Meta: %{r:.0f}%<extra></extra>'
     ))
-    
+
     fig.update_layout(
         title=dict(
-            text=f'🎯 Radar de Performance - {analista}',
-            font=dict(size=18, color=theme['text'], weight='bold'),
+            text=f'<b>🎯 Radar de Performance - {analista}</b>',  # negrito via HTML
+            font=dict(size=18, color=theme['text']),              # sem weight
             x=0.5
         ),
         height=420,
@@ -1974,22 +1967,14 @@ def criar_radar_impactante(analista, dados):
             radialaxis=dict(
                 visible=True,
                 range=[0, 100],
-                tickfont=dict(
-                    size=11,
-                    color=theme['text'],
-                    weight='bold'
-                ),
+                tickfont=dict(size=11, color=theme['text']),      # sem weight
                 gridcolor='rgba(128,128,128,0.2)',
                 linecolor='rgba(128,128,128,0.3)',
                 tickvals=[0, 20, 40, 60, 80, 100],
-                ticktext=['0%', '20%', '40%', '60%', '80%', '100%']
+                ticktext=['<b>0%</b>', '<b>20%</b>', '<b>40%</b>', '<b>60%</b>', '<b>80%</b>', '<b>100%</b>']  # negrito via HTML
             ),
             angularaxis=dict(
-                tickfont=dict(
-                    size=13,
-                    color=theme['text'],
-                    weight='bold'
-                ),
+                tickfont=dict(size=13, color=theme['text']),      # sem weight
                 gridcolor='rgba(128,128,128,0.2)',
                 linecolor='rgba(128,128,128,0.3)'
             ),
@@ -2002,20 +1987,16 @@ def criar_radar_impactante(analista, dados):
             y=-0.15,
             xanchor='center',
             x=0.5,
-            font=dict(
-                size=13,
-                color=theme['text'],
-                weight='bold'
-            ),
+            font=dict(size=13, color=theme['text']),              # sem weight
             bgcolor='rgba(0,0,0,0.3)',
             bordercolor='rgba(128,128,128,0.2)',
             borderwidth=1
         ),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color=theme['text'])
+        font=dict(color=theme['text'])                            # sem weight
     )
-    
+
     return fig
 
 # ============================================
