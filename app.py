@@ -21,8 +21,10 @@ import tempfile
 # CONFIGURAÇÃO DO MATPLOTLIB (ANTES DE QUALQUER IMPORT)
 # ============================================
 import matplotlib
-matplotlib.use('Agg')  # Backend não-interativo para evitar segmentation fault
+matplotlib.use('Agg')  # Backend não-interativo
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import numpy as np
 
 # ============================================
@@ -1678,31 +1680,34 @@ def mostrar_podio(podio):
             """, unsafe_allow_html=True)
 
 # ============================================
-# FUNCOES PARA GRÁFICOS NOS RELATÓRIOS WORD (CORRIGIDAS)
+# FUNCOES PARA GRÁFICOS NOS RELATÓRIOS WORD (CORRIGIDAS COM API OO)
 # ============================================
 
 def criar_grafico_barras_word(dados, meta, titulo, cor="#2ecc71"):
     """Cria gráfico de barras e retorna buffer de imagem"""
     try:
-        fig, ax = plt.subplots(figsize=(5, 2))  # Menor para economizar memória
+        fig = Figure(figsize=(5, 2), dpi=100)
+        ax = fig.add_subplot(111)
         bars = ax.bar(['Alcançado', 'Meta'], [dados, meta], color=[cor, '#e74c3c'], alpha=0.8)
-        
+
         ax.text(0, dados + 2, f'{dados:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
         ax.text(1, meta + 2, f'{meta:.0f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
-        
+
         ax.set_ylim(0, 110)
         ax.set_ylabel('Percentual (%)', fontsize=8)
         ax.set_title(titulo, fontsize=10, fontweight='bold')
         ax.grid(True, alpha=0.3, axis='y')
-        
+
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')  # DPI reduzido
+        canvas = FigureCanvasAgg(fig)
+        canvas.print_png(buf)
         buf.seek(0)
-        plt.close()
         return buf
     except Exception as e:
         print(f"Erro ao criar gráfico de barras: {e}")
         return None
+    finally:
+        fig.clf()
 
 def criar_grafico_radar_word(analista, dados):
     """Cria gráfico radar e retorna buffer de imagem"""
@@ -1710,19 +1715,20 @@ def criar_grafico_radar_word(analista, dados):
         categorias = ['CSAT', 'Avaliações', 'Envio']
         valores = [dados['csat'], dados['perc_avaliacoes'], dados['perc_envio']]
         metas = [dados['meta_csat'], dados['meta_geral'], 80]
-        
+
         angulos = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
         angulos += angulos[:1]
         valores += valores[:1]
         metas += metas[:1]
-        
-        fig, ax = plt.subplots(figsize=(4.5, 4.5), subplot_kw=dict(projection='polar'))
-        
-        ax.plot(angulos, valores, 'o-', linewidth=2, color='#2ecc71', label=analista)
+
+        fig = Figure(figsize=(4.5, 4.5), dpi=100)
+        ax = fig.add_subplot(111, projection='polar')
+
+        ax.plot(angulos, valores, marker='o', linestyle='-', linewidth=2, color='#2ecc71', label=analista)
         ax.fill(angulos, valores, alpha=0.25, color='#2ecc71')
-        ax.plot(angulos, metas, 'o-', linewidth=2, color='#e74c3c', linestyle='dashed', label='Meta')
+        ax.plot(angulos, metas, marker='o', linestyle='dashed', linewidth=2, color='#e74c3c', label='Meta')
         ax.fill(angulos, metas, alpha=0.1, color='#e74c3c')
-        
+
         ax.set_xticks(angulos[:-1])
         ax.set_xticklabels(categorias, fontsize=9, fontweight='bold')
         ax.set_ylim(0, 100)
@@ -1731,53 +1737,58 @@ def criar_grafico_radar_word(analista, dados):
         ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1), fontsize=8)
         ax.set_title('Radar de Performance', fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3)
-        
+
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        canvas = FigureCanvasAgg(fig)
+        canvas.print_png(buf)
         buf.seek(0)
-        plt.close()
         return buf
     except Exception as e:
         print(f"Erro ao criar radar: {e}")
         return None
+    finally:
+        fig.clf()
 
 def criar_grafico_evolucao_word(df_analista, analista, meta_csat, meta_avaliacoes):
     """Cria gráfico de evolução e retorna buffer de imagem"""
     try:
         if df_analista is None or df_analista.empty:
             return None
-        
-        fig, ax = plt.subplots(figsize=(6, 3))
+
+        fig = Figure(figsize=(6, 3), dpi=100)
+        ax = fig.add_subplot(111)
         df_analista = df_analista.sort_values('mes_ano')
-        
-        ax.plot(df_analista['mes_ano'], df_analista['csat'], 'o-', color='#2ecc71', 
+
+        ax.plot(df_analista['mes_ano'], df_analista['csat'], marker='o', linestyle='-', color='#2ecc71',
                 linewidth=2, markersize=5, label='CSAT')
-        ax.plot(df_analista['mes_ano'], df_analista['perc_avaliacoes'], 's-', color='#3498db', 
+        ax.plot(df_analista['mes_ano'], df_analista['perc_avaliacoes'], marker='s', linestyle='-', color='#3498db',
                 linewidth=2, markersize=5, label='% Avaliações')
-        ax.plot(df_analista['mes_ano'], df_analista['perc_envio'], '^-', color='#f39c12', 
+        ax.plot(df_analista['mes_ano'], df_analista['perc_envio'], marker='^', linestyle='-', color='#f39c12',
                 linewidth=2, markersize=5, label='% Envio')
-        
+
         ax.axhline(y=meta_csat, color='#e74c3c', linestyle='--', linewidth=1.5, label=f'Meta CSAT: {meta_csat}%')
         ax.axhline(y=meta_avaliacoes, color='#9b59b6', linestyle=':', linewidth=1.5, label=f'Meta Aval: {meta_avaliacoes}%')
-        
+
         ax.set_ylim(0, 100)
         ax.set_ylabel('Percentual (%)', fontsize=8)
         ax.set_xlabel('Período', fontsize=8)
         ax.legend(loc='lower right', fontsize=7)
         ax.set_title(f'Evolução Mensal - {analista}', fontsize=10, fontweight='bold')
         ax.grid(True, alpha=0.3)
-        
+
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        canvas = FigureCanvasAgg(fig)
+        canvas.print_png(buf)
         buf.seek(0)
-        plt.close()
         return buf
     except Exception as e:
         print(f"Erro ao criar evolução: {e}")
         return None
+    finally:
+        fig.clf()
 
 # ============================================
-# GERADOR DE RELATÓRIO WORD COM GRÁFICOS (CORRIGIDO - SEM HTML)
+# GERADOR DE RELATÓRIO WORD COM GRÁFICOS (CORRIGIDO)
 # ============================================
 
 def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback, 
@@ -1786,7 +1797,6 @@ def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback,
     try:
         doc = Document()
         
-        # Título
         titulo = doc.add_heading(f'📊 Relatório de Performance', 0)
         titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
@@ -1822,21 +1832,21 @@ def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback,
         # ===== GRÁFICOS =====
         doc.add_heading('📊 Gráficos de Performance', level=1)
         
-        # Gráfico 1: Barras
+        # Gráfico de barras
         img_buffer = criar_grafico_barras_word(dados['csat'], dados['meta_csat'], 'CSAT - Resultado vs Meta')
         if img_buffer:
             doc.add_paragraph('CSAT: Resultado vs Meta')
             doc.add_picture(img_buffer, width=Inches(4.5))
             doc.add_paragraph('')
         
-        # Gráfico 2: Radar
+        # Radar
         img_buffer = criar_grafico_radar_word(analista, dados)
         if img_buffer:
             doc.add_paragraph('Radar de Performance')
             doc.add_picture(img_buffer, width=Inches(4))
             doc.add_paragraph('')
         
-        # Gráfico 3: Evolução (se houver dados)
+        # Evolução
         if df_historico_analista is not None and not df_historico_analista.empty and len(df_historico_analista['mes_ano'].unique()) >= 2:
             img_buffer = criar_grafico_evolucao_word(
                 df_historico_analista,
@@ -1889,7 +1899,6 @@ def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback,
         return buffer
     except Exception as e:
         st.error(f"❌ Erro ao gerar relatório: {str(e)}")
-        # Retorna None para não quebrar o sistema
         return None
 
 # ============================================
@@ -2295,7 +2304,7 @@ Gere o feedback:
 """
 
 # ============================================
-# DASHBOARD GESTOR - VERSÃO OTIMIZADA (com width='stretch')
+# DASHBOARD GESTOR - VERSÃO OTIMIZADA
 # ============================================
 
 def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
@@ -2586,7 +2595,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                     posicao_podio = i
                     break
             
-            # Cards do analista - Versão melhorada
+            # Cards do analista
             st.markdown(f"### 📊 {analista_selecionado}")
             
             col1, col2, col3, col4 = st.columns(4)
@@ -2777,7 +2786,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # Análise Técnica em expander
+            # Análise Técnica
             with st.expander("📊 Análise Técnica de Desempenho", expanded=False):
                 analise_tecnica = gerar_analise_tecnica(
                     analista_selecionado,
@@ -2853,7 +2862,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
     return resultados
 
 # ============================================
-# DASHBOARD COORDENADOR - VERSÃO OTIMIZADA (com width='stretch')
+# DASHBOARD COORDENADOR - VERSÃO OTIMIZADA
 # ============================================
 
 def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
