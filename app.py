@@ -16,6 +16,10 @@ import calendar
 import bcrypt
 import base64
 import tempfile
+
+# ============================================
+# CONFIGURAÇÃO DO MATPLOTLIB (ANTES DE QUALQUER IMPORT)
+# ============================================
 import matplotlib
 matplotlib.use('Agg')  # Backend não-interativo para evitar segmentation fault
 import matplotlib.pyplot as plt
@@ -1679,199 +1683,214 @@ def mostrar_podio(podio):
 
 def criar_grafico_barras_word(dados, meta, titulo, cor="#2ecc71"):
     """Cria gráfico de barras e retorna buffer de imagem"""
-    fig, ax = plt.subplots(figsize=(6, 2.5))
-    
-    bars = ax.bar(['Alcançado', 'Meta'], [dados, meta], color=[cor, '#e74c3c'], alpha=0.8)
-    
-    ax.text(0, dados + 2, f'{dados:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
-    ax.text(1, meta + 2, f'{meta:.0f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
-    
-    ax.set_ylim(0, 110)
-    ax.set_ylabel('Percentual (%)', fontsize=9)
-    ax.set_title(titulo, fontsize=11, fontweight='bold')
-    ax.grid(True, alpha=0.3, axis='y')
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    buf.seek(0)
-    plt.close()
-    return buf
+    try:
+        fig, ax = plt.subplots(figsize=(5, 2))  # Menor para economizar memória
+        bars = ax.bar(['Alcançado', 'Meta'], [dados, meta], color=[cor, '#e74c3c'], alpha=0.8)
+        
+        ax.text(0, dados + 2, f'{dados:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        ax.text(1, meta + 2, f'{meta:.0f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        ax.set_ylim(0, 110)
+        ax.set_ylabel('Percentual (%)', fontsize=8)
+        ax.set_title(titulo, fontsize=10, fontweight='bold')
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')  # DPI reduzido
+        buf.seek(0)
+        plt.close()
+        return buf
+    except Exception as e:
+        print(f"Erro ao criar gráfico de barras: {e}")
+        return None
 
 def criar_grafico_radar_word(analista, dados):
     """Cria gráfico radar e retorna buffer de imagem"""
-    categorias = ['CSAT', 'Avaliações', 'Envio']
-    valores = [dados['csat'], dados['perc_avaliacoes'], dados['perc_envio']]
-    metas = [dados['meta_csat'], dados['meta_geral'], 80]
-    
-    angulos = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
-    angulos += angulos[:1]
-    valores += valores[:1]
-    metas += metas[:1]
-    
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(projection='polar'))
-    
-    ax.plot(angulos, valores, 'o-', linewidth=3, color='#2ecc71', label=analista)
-    ax.fill(angulos, valores, alpha=0.25, color='#2ecc71')
-    ax.plot(angulos, metas, 'o-', linewidth=2, color='#e74c3c', linestyle='dashed', label='Meta')
-    ax.fill(angulos, metas, alpha=0.1, color='#e74c3c')
-    
-    ax.set_xticks(angulos[:-1])
-    ax.set_xticklabels(categorias, fontsize=10, fontweight='bold')
-    ax.set_ylim(0, 100)
-    ax.set_yticks([20, 40, 60, 80, 100])
-    ax.set_yticklabels(['20%', '40%', '60%', '80%', '100%'], fontsize=8)
-    ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1), fontsize=9)
-    ax.set_title('Radar de Performance', fontsize=12, fontweight='bold')
-    ax.grid(True, alpha=0.3)
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    buf.seek(0)
-    plt.close()
-    return buf
+    try:
+        categorias = ['CSAT', 'Avaliações', 'Envio']
+        valores = [dados['csat'], dados['perc_avaliacoes'], dados['perc_envio']]
+        metas = [dados['meta_csat'], dados['meta_geral'], 80]
+        
+        angulos = np.linspace(0, 2 * np.pi, len(categorias), endpoint=False).tolist()
+        angulos += angulos[:1]
+        valores += valores[:1]
+        metas += metas[:1]
+        
+        fig, ax = plt.subplots(figsize=(4.5, 4.5), subplot_kw=dict(projection='polar'))
+        
+        ax.plot(angulos, valores, 'o-', linewidth=2, color='#2ecc71', label=analista)
+        ax.fill(angulos, valores, alpha=0.25, color='#2ecc71')
+        ax.plot(angulos, metas, 'o-', linewidth=2, color='#e74c3c', linestyle='dashed', label='Meta')
+        ax.fill(angulos, metas, alpha=0.1, color='#e74c3c')
+        
+        ax.set_xticks(angulos[:-1])
+        ax.set_xticklabels(categorias, fontsize=9, fontweight='bold')
+        ax.set_ylim(0, 100)
+        ax.set_yticks([20, 40, 60, 80, 100])
+        ax.set_yticklabels(['20%', '40%', '60%', '80%', '100%'], fontsize=7)
+        ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1), fontsize=8)
+        ax.set_title('Radar de Performance', fontsize=11, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        plt.close()
+        return buf
+    except Exception as e:
+        print(f"Erro ao criar radar: {e}")
+        return None
 
 def criar_grafico_evolucao_word(df_analista, analista, meta_csat, meta_avaliacoes):
     """Cria gráfico de evolução e retorna buffer de imagem"""
-    if df_analista is None or df_analista.empty:
+    try:
+        if df_analista is None or df_analista.empty:
+            return None
+        
+        fig, ax = plt.subplots(figsize=(6, 3))
+        df_analista = df_analista.sort_values('mes_ano')
+        
+        ax.plot(df_analista['mes_ano'], df_analista['csat'], 'o-', color='#2ecc71', 
+                linewidth=2, markersize=5, label='CSAT')
+        ax.plot(df_analista['mes_ano'], df_analista['perc_avaliacoes'], 's-', color='#3498db', 
+                linewidth=2, markersize=5, label='% Avaliações')
+        ax.plot(df_analista['mes_ano'], df_analista['perc_envio'], '^-', color='#f39c12', 
+                linewidth=2, markersize=5, label='% Envio')
+        
+        ax.axhline(y=meta_csat, color='#e74c3c', linestyle='--', linewidth=1.5, label=f'Meta CSAT: {meta_csat}%')
+        ax.axhline(y=meta_avaliacoes, color='#9b59b6', linestyle=':', linewidth=1.5, label=f'Meta Aval: {meta_avaliacoes}%')
+        
+        ax.set_ylim(0, 100)
+        ax.set_ylabel('Percentual (%)', fontsize=8)
+        ax.set_xlabel('Período', fontsize=8)
+        ax.legend(loc='lower right', fontsize=7)
+        ax.set_title(f'Evolução Mensal - {analista}', fontsize=10, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        plt.close()
+        return buf
+    except Exception as e:
+        print(f"Erro ao criar evolução: {e}")
         return None
-    
-    fig, ax = plt.subplots(figsize=(7, 3.5))
-    
-    df_analista = df_analista.sort_values('mes_ano')
-    
-    ax.plot(df_analista['mes_ano'], df_analista['csat'], 'o-', color='#2ecc71', 
-            linewidth=2, markersize=6, label='CSAT')
-    ax.plot(df_analista['mes_ano'], df_analista['perc_avaliacoes'], 's-', color='#3498db', 
-            linewidth=2, markersize=6, label='% Avaliações')
-    ax.plot(df_analista['mes_ano'], df_analista['perc_envio'], '^-', color='#f39c12', 
-            linewidth=2, markersize=6, label='% Envio')
-    
-    ax.axhline(y=meta_csat, color='#e74c3c', linestyle='--', linewidth=1.5, label=f'Meta CSAT: {meta_csat}%')
-    ax.axhline(y=meta_avaliacoes, color='#9b59b6', linestyle=':', linewidth=1.5, label=f'Meta Aval: {meta_avaliacoes}%')
-    
-    ax.set_ylim(0, 100)
-    ax.set_ylabel('Percentual (%)', fontsize=9)
-    ax.set_xlabel('Período', fontsize=9)
-    ax.legend(loc='lower right', fontsize=8)
-    ax.set_title(f'Evolução Mensal - {analista}', fontsize=11, fontweight='bold')
-    ax.grid(True, alpha=0.3)
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    buf.seek(0)
-    plt.close()
-    return buf
 
 # ============================================
-# GERADOR DE RELATÓRIO WORD COM GRÁFICOS (CORRIGIDO)
+# GERADOR DE RELATÓRIO WORD COM GRÁFICOS (CORRIGIDO - SEM HTML)
 # ============================================
 
 def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback, 
                                   media_operacao, podio, periodo, df_historico_analista=None):
     """Gera relatório Word COMPLETO com gráficos inseridos como imagens"""
-    
-    doc = Document()
-    
-    titulo = doc.add_heading(f'📊 Relatório de Performance', 0)
-    titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    subtitulo = doc.add_paragraph(f'{analista} - {periodo}')
-    subtitulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    doc.add_paragraph('')
-    
-    # ===== RESULTADOS =====
-    doc.add_heading('📋 Resultados do Período', level=1)
-    
-    table = doc.add_table(rows=5, cols=4)
-    table.style = 'Table Grid'
-    
-    headers = ['Métrica', 'Resultado', 'Meta', 'Status']
-    for i, header in enumerate(headers):
-        table.rows[0].cells[i].text = header
-        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
-    
-    resultados = [
-        ('CSAT', f'{dados["csat"]:.2f}%', f'{dados["meta_csat"]:.0f}%', '✅' if dados['csat'] >= dados['meta_csat'] else '❌'),
-        ('Avaliações', f'{dados["perc_avaliacoes"]:.2f}%', f'{dados["meta_geral"]:.0f}%', '✅' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '❌'),
-        ('Envio', f'{dados["perc_envio"]:.2f}%', '80%', '✅' if dados['perc_envio'] >= 80 else '❌'),
-        ('Atendimentos', f'{dados["total_atendimentos"]}', f'Média: {media_operacao:.0f}', '✅' if dados['total_atendimentos'] >= media_operacao else '❌')
-    ]
-    
-    for i, row_data in enumerate(resultados, 1):
-        for j, value in enumerate(row_data):
-            table.rows[i].cells[j].text = str(value)
-    
-    doc.add_paragraph('')
-    
-    # ===== GRÁFICOS =====
-    doc.add_heading('📊 Gráficos de Performance', level=1)
-    
-    # Gráfico de barras
-    img_buffer = criar_grafico_barras_word(dados['csat'], dados['meta_csat'], 'CSAT - Resultado vs Meta')
-    if img_buffer:
-        doc.add_paragraph('CSAT: Resultado vs Meta')
-        doc.add_picture(img_buffer, width=Inches(5))
-        doc.add_paragraph('')
-    
-    # Gráfico radar
-    img_buffer = criar_grafico_radar_word(analista, dados)
-    if img_buffer:
-        doc.add_paragraph('Radar de Performance')
-        doc.add_picture(img_buffer, width=Inches(4.5))
-        doc.add_paragraph('')
-    
-    # Gráfico de evolução (se houver dados)
-    if df_historico_analista is not None and not df_historico_analista.empty and len(df_historico_analista['mes_ano'].unique()) >= 2:
-        img_buffer = criar_grafico_evolucao_word(
-            df_historico_analista,
-            analista,
-            dados['meta_csat'],
-            dados['meta_geral']
-        )
-        if img_buffer:
-            doc.add_paragraph('Evolução Mensal')
-            doc.add_picture(img_buffer, width=Inches(6))
-            doc.add_paragraph('')
-    
-    doc.add_page_break()
-    
-    # ===== ANÁLISE TÉCNICA =====
-    doc.add_heading('📝 Análise Técnica de Desempenho', level=1)
-    
-    for linha in analise_tecnica.split('\n'):
-        if linha.strip():
-            if linha.strip().startswith('### 1.'):
-                doc.add_heading('Qualidade e Satisfação do Cliente (CSAT)', level=2)
-            elif linha.strip().startswith('### 2.'):
-                doc.add_heading('Engajamento e Coleta de Feedback', level=2)
-            elif linha.strip().startswith('### 3.'):
-                doc.add_heading('Produtividade e Volumetria', level=2)
-            else:
-                doc.add_paragraph(linha.strip())
-    
-    if feedback:
-        doc.add_page_break()
-        doc.add_heading('💬 Feedback de Performance', level=1)
-        doc.add_paragraph(f'Status Geral: {dados["status"]}')
+    try:
+        doc = Document()
+        
+        # Título
+        titulo = doc.add_heading(f'📊 Relatório de Performance', 0)
+        titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        subtitulo = doc.add_paragraph(f'{analista} - {periodo}')
+        subtitulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
         doc.add_paragraph('')
         
-        for linha in feedback.split('\n'):
-            if linha.strip() and not linha.strip().startswith('#'):
-                if linha.strip().startswith('###'):
-                    doc.add_heading(linha.strip().replace('###', '').strip(), level=2)
+        # ===== RESULTADOS =====
+        doc.add_heading('📋 Resultados do Período', level=1)
+        
+        table = doc.add_table(rows=5, cols=4)
+        table.style = 'Table Grid'
+        
+        headers = ['Métrica', 'Resultado', 'Meta', 'Status']
+        for i, header in enumerate(headers):
+            table.rows[0].cells[i].text = header
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        
+        resultados = [
+            ('CSAT', f'{dados["csat"]:.2f}%', f'{dados["meta_csat"]:.0f}%', '✅' if dados['csat'] >= dados['meta_csat'] else '❌'),
+            ('Avaliações', f'{dados["perc_avaliacoes"]:.2f}%', f'{dados["meta_geral"]:.0f}%', '✅' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '❌'),
+            ('Envio', f'{dados["perc_envio"]:.2f}%', '80%', '✅' if dados['perc_envio'] >= 80 else '❌'),
+            ('Atendimentos', f'{dados["total_atendimentos"]}', f'Média: {media_operacao:.0f}', '✅' if dados['total_atendimentos'] >= media_operacao else '❌')
+        ]
+        
+        for i, row_data in enumerate(resultados, 1):
+            for j, value in enumerate(row_data):
+                table.rows[i].cells[j].text = str(value)
+        
+        doc.add_paragraph('')
+        
+        # ===== GRÁFICOS =====
+        doc.add_heading('📊 Gráficos de Performance', level=1)
+        
+        # Gráfico 1: Barras
+        img_buffer = criar_grafico_barras_word(dados['csat'], dados['meta_csat'], 'CSAT - Resultado vs Meta')
+        if img_buffer:
+            doc.add_paragraph('CSAT: Resultado vs Meta')
+            doc.add_picture(img_buffer, width=Inches(4.5))
+            doc.add_paragraph('')
+        
+        # Gráfico 2: Radar
+        img_buffer = criar_grafico_radar_word(analista, dados)
+        if img_buffer:
+            doc.add_paragraph('Radar de Performance')
+            doc.add_picture(img_buffer, width=Inches(4))
+            doc.add_paragraph('')
+        
+        # Gráfico 3: Evolução (se houver dados)
+        if df_historico_analista is not None and not df_historico_analista.empty and len(df_historico_analista['mes_ano'].unique()) >= 2:
+            img_buffer = criar_grafico_evolucao_word(
+                df_historico_analista,
+                analista,
+                dados['meta_csat'],
+                dados['meta_geral']
+            )
+            if img_buffer:
+                doc.add_paragraph('Evolução Mensal')
+                doc.add_picture(img_buffer, width=Inches(5.5))
+                doc.add_paragraph('')
+        
+        doc.add_page_break()
+        
+        # ===== ANÁLISE TÉCNICA =====
+        doc.add_heading('📝 Análise Técnica de Desempenho', level=1)
+        
+        for linha in analise_tecnica.split('\n'):
+            if linha.strip():
+                if linha.strip().startswith('### 1.'):
+                    doc.add_heading('Qualidade e Satisfação do Cliente (CSAT)', level=2)
+                elif linha.strip().startswith('### 2.'):
+                    doc.add_heading('Engajamento e Coleta de Feedback', level=2)
+                elif linha.strip().startswith('### 3.'):
+                    doc.add_heading('Produtividade e Volumetria', level=2)
                 else:
                     doc.add_paragraph(linha.strip())
-    
-    doc.add_paragraph('')
-    doc.add_paragraph('---')
-    doc.add_paragraph(f'📅 Relatório gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}')
-    doc.add_paragraph('Sistema de Performance v15.0 | Relatório com Gráficos')
-    
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
+        
+        if feedback:
+            doc.add_page_break()
+            doc.add_heading('💬 Feedback de Performance', level=1)
+            doc.add_paragraph(f'Status Geral: {dados["status"]}')
+            doc.add_paragraph('')
+            
+            for linha in feedback.split('\n'):
+                if linha.strip() and not linha.strip().startswith('#'):
+                    if linha.strip().startswith('###'):
+                        doc.add_heading(linha.strip().replace('###', '').strip(), level=2)
+                    else:
+                        doc.add_paragraph(linha.strip())
+        
+        doc.add_paragraph('')
+        doc.add_paragraph('---')
+        doc.add_paragraph(f'📅 Relatório gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}')
+        doc.add_paragraph('Sistema de Performance v15.0 | Relatório com Gráficos')
+        
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        st.error(f"❌ Erro ao gerar relatório: {str(e)}")
+        # Retorna None para não quebrar o sistema
+        return None
 
 # ============================================
 # RADAR IMPACTANTE (mantido)
@@ -2798,13 +2817,14 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                     df_historico_analista
                 )
                 
-                st.download_button(
-                    label="📥 Baixar Análise (Word)",
-                    data=relatorio_individual,
-                    file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    width='stretch'
-                )
+                if relatorio_individual:
+                    st.download_button(
+                        label="📥 Baixar Análise (Word)",
+                        data=relatorio_individual,
+                        file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        width='stretch'
+                    )
             
             with col2:
                 st.markdown("**📄 Relatório Completo**")
@@ -2821,13 +2841,14 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                     df_historico_analista
                 )
                 
-                st.download_button(
-                    label="📥 Baixar Relatório Completo (Word)",
-                    data=relatorio_completo,
-                    file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    width='stretch'
-                )
+                if relatorio_completo:
+                    st.download_button(
+                        label="📥 Baixar Relatório Completo (Word)",
+                        data=relatorio_completo,
+                        file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        width='stretch'
+                    )
     
     return resultados
 
@@ -3274,13 +3295,14 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                     df_historico_analista
                 )
                 
-                st.download_button(
-                    label="📥 Baixar Análise (Word)",
-                    data=relatorio_individual,
-                    file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    width='stretch'
-                )
+                if relatorio_individual:
+                    st.download_button(
+                        label="📥 Baixar Análise (Word)",
+                        data=relatorio_individual,
+                        file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        width='stretch'
+                    )
             
             with col2:
                 st.markdown("**📄 Relatório Completo**")
@@ -3297,13 +3319,14 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                     df_historico_analista
                 )
                 
-                st.download_button(
-                    label="📥 Baixar Relatório Completo (Word)",
-                    data=relatorio_completo,
-                    file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    width='stretch'
-                )
+                if relatorio_completo:
+                    st.download_button(
+                        label="📥 Baixar Relatório Completo (Word)",
+                        data=relatorio_completo,
+                        file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        width='stretch'
+                    )
     
     return resultados
 
