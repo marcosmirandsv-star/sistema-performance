@@ -2895,78 +2895,75 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # ===== DOWNLOAD DE RELATÓRIOS (CORRIGIDO) =====
-            st.subheader("📄 Download de Relatórios")
-            st.caption("📊 Relatórios com gráficos de performance incluídos")
+           # ===== DOWNLOAD DE RELATÓRIOS (CORRIGIDO) =====
+st.subheader("📄 Download de Relatórios")
+st.caption("📊 Relatórios com gráficos de performance incluídos")
 
-            df_historico_analista = None
-            if supabase:
-                if st.session_state.get('acesso_total', False):
-                    df_historico_analista = carregar_historico(supabase, analista=analista_selecionado)
-                else:
-                    df_historico_analista = carregar_historico(supabase, analista=analista_selecionado, gestor=gestor_nome)
+df_historico_analista = None
+if supabase:
+    df_historico_analista = carregar_historico(supabase, analista=analista_selecionado)
 
-            col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
 
-            with col1:
-                st.markdown("**📊 Relatório Individual**")
-                st.caption("Análise técnica com gráficos (sem feedback)")
-                
-                try:
-                    relatorio_individual = gerar_relatorio_completo_word(
-                        analista_selecionado,
-                        dados,
-                        analise_tecnica,
-                        "",
-                        media_atendimentos,
-                        podio_efetivo,
-                        periodo,
-                        df_historico_analista
-                    )
-                except Exception as e:
-                    st.error(f"❌ Erro ao gerar relatório individual: {str(e)}")
-                    relatorio_individual = None
-                
-                if relatorio_individual is not None:
-                    st.download_button(
-                        label="📥 Baixar Análise (Word)",
-                        data=relatorio_individual,
-                        file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True
-                    )
-                else:
-                    st.warning("⚠️ Não foi possível gerar o relatório individual.")
+with col1:
+    st.markdown("**📊 Relatório Individual**")
+    st.caption("Análise técnica com gráficos (sem feedback)")
+    
+    try:
+        relatorio_individual = gerar_relatorio_completo_word(
+            analista_selecionado,
+            dados,
+            analise_tecnica,
+            "",
+            media_atendimentos,
+            podio,
+            periodo,
+            df_historico_analista
+        )
+    except Exception as e:
+        st.error(f"❌ Erro ao gerar relatório individual: {str(e)}")
+        relatorio_individual = None
+    
+    if relatorio_individual is not None:
+        st.download_button(
+            label="📥 Baixar Análise (Word)",
+            data=relatorio_individual,
+            file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+    else:
+        st.warning("⚠️ Não foi possível gerar o relatório individual.")
 
-            with col2:
-                st.markdown("**📄 Relatório Completo**")
-                st.caption("Análise técnica + Feedback SARI/MIMO com gráficos")
-                
-                try:
-                    relatorio_completo = gerar_relatorio_completo_word(
-                        analista_selecionado,
-                        dados,
-                        analise_tecnica,
-                        feedback_final,
-                        media_atendimentos,
-                        podio_efetivo,
-                        periodo,
-                        df_historico_analista
-                    )
-                except Exception as e:
-                    st.error(f"❌ Erro ao gerar relatório completo: {str(e)}")
-                    relatorio_completo = None
-                
-                if relatorio_completo is not None:
-                    st.download_button(
-                        label="📥 Baixar Relatório Completo (Word)",
-                        data=relatorio_completo,
-                        file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True
-                    )
-                else:
-                    st.warning("⚠️ Não foi possível gerar o relatório completo.")
+with col2:
+    st.markdown("**📄 Relatório Completo**")
+    st.caption("Análise técnica + Feedback SARI/MIMO com gráficos")
+    
+    try:
+        relatorio_completo = gerar_relatorio_completo_word(
+            analista_selecionado,
+            dados,
+            analise_tecnica,
+            feedback_final,
+            media_atendimentos,
+            podio,
+            periodo,
+            df_historico_analista
+        )
+    except Exception as e:
+        st.error(f"❌ Erro ao gerar relatório completo: {str(e)}")
+        relatorio_completo = None
+    
+    if relatorio_completo is not None:
+        st.download_button(
+            label="📥 Baixar Relatório Completo (Word)",
+            data=relatorio_completo,
+            file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+    else:
+        st.warning("⚠️ Não foi possível gerar o relatório completo.")
     
     return resultados
 
