@@ -2325,7 +2325,6 @@ Gere o feedback:
 # ============================================
 # DASHBOARD GESTOR - VERSÃO OTIMIZADA
 # ============================================
-
 def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
     periodo = padronizar_periodo(periodo)
     
@@ -2491,7 +2490,6 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
     with tab_ranking:
         st.subheader("🏆 Pódio do Mês")
         
-        # ===== CARREGAR DADOS DO PÓDIO =====
         analistas_excluidos = carregar_exclusoes_podio(supabase, periodo, gestor_nome) if supabase else []
         resultados_para_podio = {k: v for k, v in resultados.items() if k not in analistas_excluidos}
         podio = calcular_podio(resultados_para_podio, media_atendimentos)
@@ -2505,12 +2503,10 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
         if podio_manual:
             st.caption("✏️ Pódio ajustado manualmente pelo gestor")
         
-        # ===== MOSTRAR PÓDIO =====
         mostrar_podio(podio_efetivo)
         
         st.markdown("---")
         
-        # ===== EDITAR PÓDIO MANUALMENTE =====
         with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
             st.markdown("### Excluir analistas do cálculo do pódio")
             st.caption("Analistas com volume atípico (ex: ajuda ocasional) podem ser removidos da base de cálculo da média e elegibilidade do pódio.")
@@ -2700,7 +2696,6 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                     posicao_podio = i
                     break
             
-            # Cards do analista
             st.markdown(f"### 📊 {analista_selecionado}")
             
             col1, col2, col3, col4 = st.columns(4)
@@ -2791,7 +2786,6 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # Radar e Evolução
             col1, col2 = st.columns(2)
             
             with col1:
@@ -2826,7 +2820,6 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # Feedback
             st.subheader("📝 Feedback de Performance")
             
             col1, col2 = st.columns([2, 1])
@@ -2891,7 +2884,6 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # Análise Técnica
             with st.expander("📊 Análise Técnica de Desempenho", expanded=False):
                 analise_tecnica = gerar_analise_tecnica(
                     analista_selecionado,
@@ -2903,66 +2895,78 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # Download de Relatórios
+            # ===== DOWNLOAD DE RELATÓRIOS (CORRIGIDO) =====
             st.subheader("📄 Download de Relatórios")
             st.caption("📊 Relatórios com gráficos de performance incluídos")
-            
+
             df_historico_analista = None
             if supabase:
                 if st.session_state.get('acesso_total', False):
                     df_historico_analista = carregar_historico(supabase, analista=analista_selecionado)
                 else:
                     df_historico_analista = carregar_historico(supabase, analista=analista_selecionado, gestor=gestor_nome)
-            
+
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 st.markdown("**📊 Relatório Individual**")
                 st.caption("Análise técnica com gráficos (sem feedback)")
                 
-                relatorio_individual = gerar_relatorio_completo_word(
-                    analista_selecionado,
-                    dados,
-                    analise_tecnica,
-                    "",
-                    media_atendimentos,
-                    podio_efetivo,
-                    periodo,
-                    df_historico_analista
-                )
+                try:
+                    relatorio_individual = gerar_relatorio_completo_word(
+                        analista_selecionado,
+                        dados,
+                        analise_tecnica,
+                        "",
+                        media_atendimentos,
+                        podio_efetivo,
+                        periodo,
+                        df_historico_analista
+                    )
+                except Exception as e:
+                    st.error(f"❌ Erro ao gerar relatório individual: {str(e)}")
+                    relatorio_individual = None
                 
-                if relatorio_individual:
+                if relatorio_individual is not None:
                     st.download_button(
                         label="📥 Baixar Análise (Word)",
                         data=relatorio_individual,
                         file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        width='stretch'
+                        use_container_width=True
                     )
-            
+                else:
+                    st.warning("⚠️ Não foi possível gerar o relatório individual.")
+
             with col2:
                 st.markdown("**📄 Relatório Completo**")
                 st.caption("Análise técnica + Feedback SARI/MIMO com gráficos")
                 
-                relatorio_completo = gerar_relatorio_completo_word(
-                    analista_selecionado,
-                    dados,
-                    analise_tecnica,
-                    feedback_final,
-                    media_atendimentos,
-                    podio_efetivo,
-                    periodo,
-                    df_historico_analista
-                )
+                try:
+                    relatorio_completo = gerar_relatorio_completo_word(
+                        analista_selecionado,
+                        dados,
+                        analise_tecnica,
+                        feedback_final,
+                        media_atendimentos,
+                        podio_efetivo,
+                        periodo,
+                        df_historico_analista
+                    )
+                except Exception as e:
+                    st.error(f"❌ Erro ao gerar relatório completo: {str(e)}")
+                    relatorio_completo = None
                 
-                if relatorio_completo:
+                if relatorio_completo is not None:
                     st.download_button(
                         label="📥 Baixar Relatório Completo (Word)",
                         data=relatorio_completo,
                         file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        width='stretch'
+                        use_container_width=True
                     )
+                else:
+                    st.warning("⚠️ Não foi possível gerar o relatório completo.")
     
     return resultados
 
