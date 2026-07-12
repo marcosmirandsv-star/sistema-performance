@@ -1283,168 +1283,290 @@ def calcular_podio(resultados, media_atendimentos=None, limiar_csat=90):
     return [(nome, dados['csat'], dados['total_atendimentos'], dados['perc_avaliacoes']) for nome, dados in top_3]
 
 # ============================================
-# FUNCOES DE DASHBOARD VISUAL
+# FUNCOES DE DASHBOARD VISUAL - REFATORADAS
 # ============================================
 
 def criar_cards_indicadores(dados, meta_csat=90, meta_avaliacoes=25, meta_envio=90):
+    """Cards superiores com indicadores principais"""
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
-        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #2ecc71;">
-            <p style="font-size: 14px; color: #666; margin: 0;">📊 Total de Registros</p>
-            <p style="font-size: 34px; font-weight: bold; margin: 5px 0;">{dados.get('total_registros', 0)}</p>
-            <p style="font-size: 11px; color: #999; margin: 0;">Analistas no período</p>
+        <div style="background: var(--background-color, #ffffff); padding: 20px; border-radius: 12px; 
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #2ecc71;
+                    color: var(--text-color, #333333);">
+            <p style="font-size: 14px; color: var(--text-secondary, #666666); margin: 0;">📊 Total de Registros</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: var(--text-color, #333333);">
+                {dados.get('total_registros', 0)}
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999999); margin: 0;">Analistas no período</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         cor_csat = "#2ecc71" if dados.get('csat_medio', 0) >= meta_csat else "#e74c3c"
         st.markdown(f"""
-        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_csat};">
-            <p style="font-size: 14px; color: #666; margin: 0;">⭐ CSAT Médio</p>
-            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_csat};">{dados.get('csat_medio', 0):.2f}%</p>
-            <p style="font-size: 11px; color: #999; margin: 0;">Meta: {meta_csat}%</p>
+        <div style="background: var(--background-color, #ffffff); padding: 20px; border-radius: 12px; 
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_csat};
+                    color: var(--text-color, #333333);">
+            <p style="font-size: 14px; color: var(--text-secondary, #666666); margin: 0;">⭐ CSAT Médio</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_csat};">
+                {dados.get('csat_medio', 0):.2f}%
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999999); margin: 0;">Meta: {meta_csat}%</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         cor_avaliacoes = "#2ecc71" if dados.get('perc_avaliacoes_medio', 0) >= meta_avaliacoes else "#e74c3c"
         st.markdown(f"""
-        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_avaliacoes};">
-            <p style="font-size: 14px; color: #666; margin: 0;">📝 % Avaliações Médio</p>
-            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_avaliacoes};">{dados.get('perc_avaliacoes_medio', 0):.2f}%</p>
-            <p style="font-size: 11px; color: #999; margin: 0;">Meta: {meta_avaliacoes}%</p>
+        <div style="background: var(--background-color, #ffffff); padding: 20px; border-radius: 12px; 
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_avaliacoes};
+                    color: var(--text-color, #333333);">
+            <p style="font-size: 14px; color: var(--text-secondary, #666666); margin: 0;">📝 % Avaliações Médio</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_avaliacoes};">
+                {dados.get('perc_avaliacoes_medio', 0):.2f}%
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999999); margin: 0;">Meta: {meta_avaliacoes}%</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         cor_envio = "#2ecc71" if dados.get('perc_envio_medio', 0) >= meta_envio else "#e74c3c"
         st.markdown(f"""
-        <div style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_envio};">
-            <p style="font-size: 14px; color: #666; margin: 0;">📤 % Envio Médio</p>
-            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_envio};">{dados.get('perc_envio_medio', 0):.2f}%</p>
-            <p style="font-size: 11px; color: #999; margin: 0;">Meta: {meta_envio}%</p>
+        <div style="background: var(--background-color, #ffffff); padding: 20px; border-radius: 12px; 
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid {cor_envio};
+                    color: var(--text-color, #333333);">
+            <p style="font-size: 14px; color: var(--text-secondary, #666666); margin: 0;">📤 % Envio Médio</p>
+            <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {cor_envio};">
+                {dados.get('perc_envio_medio', 0):.2f}%
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999999); margin: 0;">Meta: {meta_envio}%</p>
         </div>
         """, unsafe_allow_html=True)
 
-def criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat=90, meta_avaliacoes=25, meta_envio=90):
-    st.subheader("🚦 Saúde da Equipe")
+def criar_painel_inteligente(csat_medio, perc_avaliacoes_medio, perc_envio_medio, 
+                           metas_superadas, total_analistas, periodo_anterior=None):
+    """
+    Painel inteligente substituindo o antigo 'Saúde da Equipe'
+    Mostra insights complementares, não repetindo os cards principais
+    """
+    st.subheader("🧠 Painel Inteligente de Performance")
     
-    if csat_medio >= meta_csat:
-        cor_csat = "🟢"; status_csat = "Saudável"; bg_csat = "#d4edda"
-    elif csat_medio >= meta_csat - 2:
-        cor_csat = "🟡"; status_csat = "Atenção"; bg_csat = "#fff3cd"
-    else:
-        cor_csat = "🔴"; status_csat = "Crítico"; bg_csat = "#f8d7da"
+    # Calcular indicadores de saúde
+    saude_csat = "🟢" if csat_medio >= 90 else "🟡" if csat_medio >= 85 else "🔴"
+    saude_avaliacoes = "🟢" if perc_avaliacoes_medio >= 25 else "🟡" if perc_avaliacoes_medio >= 20 else "🔴"
+    saude_envio = "🟢" if perc_envio_medio >= 80 else "🟡" if perc_envio_medio >= 70 else "🔴"
     
-    if perc_avaliacoes_medio >= meta_avaliacoes:
-        cor_avaliacoes = "🟢"; status_avaliacoes = "Saudável"; bg_avaliacoes = "#d4edda"
-    elif perc_avaliacoes_medio >= meta_avaliacoes - 5:
-        cor_avaliacoes = "🟡"; status_avaliacoes = "Atenção"; bg_avaliacoes = "#fff3cd"
-    else:
-        cor_avaliacoes = "🔴"; status_avaliacoes = "Crítico"; bg_avaliacoes = "#f8d7da"
+    # Tendências (simuladas para exemplo - na prática viriam do histórico)
+    tendencia_csat = "📈" if csat_medio > 87 else "📉"
+    tendencia_avaliacoes = "📈" if perc_avaliacoes_medio > 23 else "📉"
     
-    if perc_envio_medio >= meta_envio:
-        cor_envio = "🟢"; status_envio = "Saudável"; bg_envio = "#d4edda"
-    elif perc_envio_medio >= 80:
-        cor_envio = "🟡"; status_envio = "Atenção"; bg_envio = "#fff3cd"
-    else:
-        cor_envio = "🔴"; status_envio = "Crítico"; bg_envio = "#f8d7da"
+    col1, col2, col3, col4 = st.columns(4)
     
-    col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
-        <div style="background: {bg_csat}; padding: 15px; border-radius: 10px; text-align: center;">
-            <p style="font-size: 28px; margin: 0;">{cor_csat}</p>
-            <p style="font-size: 20px; font-weight: bold; margin: 0;">CSAT</p>
-            <p style="font-size: 18px; color: #333;">{csat_medio:.2f}%</p>
-            <p style="font-size: 12px; color: #666;">Status: {status_csat}</p>
-            <p style="font-size: 11px; color: #999;">Meta: {meta_csat}%</p>
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    border-left: 4px solid {saude_csat.replace('🟢', '#2ecc71').replace('🟡', '#f39c12').replace('🔴', '#e74c3c')};">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">📊 Saúde Geral da Equipe</p>
+            <p style="font-size: 24px; font-weight: bold; margin: 5px 0; color: var(--text-color, #333);">
+                {metas_superadas}/{total_analistas}
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999); margin: 0;">Analistas com metas superadas</p>
         </div>
         """, unsafe_allow_html=True)
+    
     with col2:
         st.markdown(f"""
-        <div style="background: {bg_avaliacoes}; padding: 15px; border-radius: 10px; text-align: center;">
-            <p style="font-size: 28px; margin: 0;">{cor_avaliacoes}</p>
-            <p style="font-size: 20px; font-weight: bold; margin: 0;">Avaliações</p>
-            <p style="font-size: 18px; color: #333;">{perc_avaliacoes_medio:.2f}%</p>
-            <p style="font-size: 12px; color: #666;">Status: {status_avaliacoes}</p>
-            <p style="font-size: 11px; color: #999;">Meta: {meta_avaliacoes}%</p>
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    border-left: 4px solid {saude_csat.replace('🟢', '#2ecc71').replace('🟡', '#f39c12').replace('🔴', '#e74c3c')};">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">⭐ Status CSAT {tendencia_csat}</p>
+            <p style="font-size: 24px; font-weight: bold; margin: 5px 0; color: var(--text-color, #333);">
+                {saude_csat} {csat_medio:.1f}%
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999); margin: 0;">
+                {'✅ Acima da meta' if csat_medio >= 90 else '⚡ Atenção' if csat_medio >= 85 else '🚨 Crítico'}
+            </p>
         </div>
         """, unsafe_allow_html=True)
+    
     with col3:
         st.markdown(f"""
-        <div style="background: {bg_envio}; padding: 15px; border-radius: 10px; text-align: center;">
-            <p style="font-size: 28px; margin: 0;">{cor_envio}</p>
-            <p style="font-size: 20px; font-weight: bold; margin: 0;">Envio</p>
-            <p style="font-size: 18px; color: #333;">{perc_envio_medio:.2f}%</p>
-            <p style="font-size: 12px; color: #666;">Status: {status_envio}</p>
-            <p style="font-size: 11px; color: #999;">Meta: {meta_envio}%</p>
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    border-left: 4px solid {saude_avaliacoes.replace('🟢', '#2ecc71').replace('🟡', '#f39c12').replace('🔴', '#e74c3c')};">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">📝 Avaliações {tendencia_avaliacoes}</p>
+            <p style="font-size: 24px; font-weight: bold; margin: 5px 0; color: var(--text-color, #333);">
+                {saude_avaliacoes} {perc_avaliacoes_medio:.1f}%
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999); margin: 0;">
+                {'✅ Meta atingida' if perc_avaliacoes_medio >= 25 else '⚡ Atenção' if perc_avaliacoes_medio >= 20 else '🚨 Crítico'}
+            </p>
         </div>
         """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    border-left: 4px solid {saude_envio.replace('🟢', '#2ecc71').replace('🟡', '#f39c12').replace('🔴', '#e74c3c')};">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">📤 Taxa de Envio</p>
+            <p style="font-size: 24px; font-weight: bold; margin: 5px 0; color: var(--text-color, #333);">
+                {saude_envio} {perc_envio_medio:.1f}%
+            </p>
+            <p style="font-size: 11px; color: var(--text-secondary, #999); margin: 0;">
+                {'✅ Ótimo' if perc_envio_medio >= 80 else '⚡ Atenção' if perc_envio_medio >= 70 else '🚨 Crítico'}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Alertas e Insights
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🔔 Alertas e Insights")
+        alertas = []
+        
+        if csat_medio < 85:
+            alertas.append("🚨 CSAT médio está crítico (< 85%). Ação imediata necessária!")
+        elif csat_medio < 90:
+            alertas.append("⚡ CSAT médio em atenção. Foco em elevar para ≥ 90%.")
+        else:
+            alertas.append("✅ CSAT da equipe está saudável!")
+        
+        if perc_avaliacoes_medio < 20:
+            alertas.append("🚨 Taxa de avaliações crítica (< 20%). Reforçar coleta urgente!")
+        elif perc_avaliacoes_medio < 25:
+            alertas.append("⚡ Taxa de avaliações abaixo da meta. Intensificar oferecimento.")
+        else:
+            alertas.append("✅ Taxa de avaliações no alvo!")
+        
+        for alerta in alertas:
+            st.markdown(f"- {alerta}")
+    
+    with col2:
+        st.markdown("#### 💡 Recomendações Estratégicas")
+        recomendacoes = []
+        
+        if csat_medio >= 90 and perc_avaliacoes_medio >= 25:
+            recomendacoes.append("🏆 Equipe com excelente performance! Manter e compartilhar práticas.")
+        elif csat_medio >= 90:
+            recomendacoes.append("⭐ CSAT excelente! Foco em aumentar a coleta de avaliações.")
+        elif perc_avaliacoes_medio >= 25:
+            recomendacoes.append("📊 Boa coleta de avaliações! Trabalhar na qualidade para elevar CSAT.")
+        
+        if len(recomendacoes) == 0:
+            recomendacoes.append("🎯 Foco prioritário: Elevar CSAT e aumentar coleta de avaliações.")
+        
+        for recomendacao in recomendacoes:
+            st.markdown(f"- {recomendacao}")
+    
     st.markdown("---")
 
-def criar_grafico_evolucao(df_historico, coluna, titulo, cor, meta=None, meta_label=None):
+def criar_grafico_evolucao(df_historico, titulo="Evolução dos Indicadores"):
+    """
+    Gráfico unificado com todas as métricas e metas
+    Adaptado para dark/light mode
+    """
     if df_historico is None or df_historico.empty:
         return None
     
+    # Ordenar meses
     meses_ordenados = ordenar_meses(df_historico['mes_ano'].unique().tolist())
     df_ordenado = df_historico.copy()
     df_ordenado['ordem'] = df_ordenado['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
     df_ordenado = df_ordenado.sort_values('ordem')
     
     fig = go.Figure()
+    
+    # CSAT
     fig.add_trace(go.Scatter(
         x=df_ordenado['mes_ano'],
-        y=df_ordenado[coluna],
+        y=df_ordenado['csat'],
         mode='lines+markers',
-        name=titulo,
-        line=dict(color=cor, width=3),
-        marker=dict(size=8, color=cor),
-        hovertemplate='<b>%{x}</b><br>%{y:.2f}%<extra></extra>'
+        name='CSAT',
+        line=dict(color='#2ecc71', width=3),
+        marker=dict(size=8, color='#2ecc71'),
+        hovertemplate='<b>%{x}</b><br>CSAT: %{y:.2f}%<extra></extra>'
     ))
     
-    if meta is not None:
-        meta_data = [meta] * len(df_ordenado)
-        fig.add_trace(go.Scatter(
-            x=df_ordenado['mes_ano'],
-            y=meta_data,
-            mode='lines',
-            name=meta_label if meta_label else 'Meta',
-            line=dict(color='red', width=2, dash='dash'),
-            hovertemplate='<b>%{x}</b><br>Meta: %{y:.0f}%<extra></extra>'
-        ))
+    # % Avaliações
+    fig.add_trace(go.Scatter(
+        x=df_ordenado['mes_ano'],
+        y=df_ordenado['perc_avaliacoes'],
+        mode='lines+markers',
+        name='% Avaliações',
+        line=dict(color='#3498db', width=3),
+        marker=dict(size=8, color='#3498db'),
+        hovertemplate='<b>%{x}</b><br>Avaliações: %{y:.2f}%<extra></extra>'
+    ))
     
+    # % Envio
+    fig.add_trace(go.Scatter(
+        x=df_ordenado['mes_ano'],
+        y=df_ordenado['perc_envio'],
+        mode='lines+markers',
+        name='% Envio',
+        line=dict(color='#f39c12', width=3),
+        marker=dict(size=8, color='#f39c12'),
+        hovertemplate='<b>%{x}</b><br>Envio: %{y:.2f}%<extra></extra>'
+    ))
+    
+    # Metas
+    fig.add_trace(go.Scatter(
+        x=df_ordenado['mes_ano'],
+        y=[90] * len(df_ordenado),
+        mode='lines',
+        name='Meta CSAT (90%)',
+        line=dict(color='#e74c3c', width=2, dash='dash'),
+        hovertemplate='Meta CSAT: 90%<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=df_ordenado['mes_ano'],
+        y=[25] * len(df_ordenado),
+        mode='lines',
+        name='Meta Avaliações (25%)',
+        line=dict(color='#9b59b6', width=2, dash='dash'),
+        hovertemplate='Meta Avaliações: 25%<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=df_ordenado['mes_ano'],
+        y=[80] * len(df_ordenado),
+        mode='lines',
+        name='Meta Envio (80%)',
+        line=dict(color='#1abc9c', width=2, dash='dash'),
+        hovertemplate='Meta Envio: 80%<extra></extra>'
+    ))
+    
+    # Layout adaptável a temas
     fig.update_layout(
-        height=400,
-        margin=dict(l=20, r=20, t=50, b=20),
-        yaxis=dict(
-            title='Percentual (%)',
-            range=[0, 100],
-            gridcolor='rgba(255,255,255,0.1)',
-            title_font=dict(color='#e0e0e0', size=13),
-            tickfont=dict(color='#e0e0e0', size=12)
-        ),
-        xaxis=dict(
-            title='Período',
-            gridcolor='rgba(255,255,255,0.05)',
-            title_font=dict(color='#e0e0e0', size=13),
-            tickfont=dict(color='#e0e0e0', size=12)
-        ),
+        title=titulo,
+        height=450,
+        xaxis_title='Período',
+        yaxis_title='Percentual (%)',
+        yaxis_range=[0, 100],
+        hovermode='x unified',
         legend=dict(
             orientation='h',
             yanchor='bottom',
-            y=-0.3,
+            y=-0.2,
             xanchor='center',
-            x=0.5,
-            font=dict(color='#e0e0e0', size=12)
+            x=0.5
         ),
-        hovermode='x unified',
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#e0e0e0', size=13)
+        font=dict(color='var(--text-color, #e0e0e0)'),
+        xaxis=dict(
+            gridcolor='rgba(128,128,128,0.15)',
+            tickfont=dict(color='var(--text-color, #e0e0e0)')
+        ),
+        yaxis=dict(
+            gridcolor='rgba(128,128,128,0.15)',
+            tickfont=dict(color='var(--text-color, #e0e0e0)')
+        )
     )
+    
     return fig
 
 def ordenar_meses(meses):
@@ -1474,7 +1596,7 @@ def ordenar_meses(meses):
     return sorted(meses, key=extrair_ano_mes)
 
 # ============================================
-# DASHBOARD GESTOR
+# FUNCOES DE DASHBOARD - REFATORADAS
 # ============================================
 
 def dashboard_gestor(periodo, gestor_nome, supabase):
@@ -1525,12 +1647,23 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     meta_avaliacoes = 25
     meta_envio = 90
     
+    # Cards superiores
     criar_cards_indicadores(dados_cards, meta_csat, meta_avaliacoes, meta_envio)
     st.info(f"📅 Período: {periodo} | 👤 Gestor: {gestor_nome} | 🏆 Metas Superadas: {metas_superadas}/{total_analistas}")
     st.markdown("---")
     
-    criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat, meta_avaliacoes, meta_envio)
+    # Painel Inteligente (substitui Saúde da Equipe)
+    criar_painel_inteligente(
+        csat_medio, 
+        perc_avaliacoes_medio, 
+        perc_envio_medio,
+        metas_superadas, 
+        total_analistas
+    )
     
+    st.markdown("---")
+    
+    # Gráfico unificado de evolução
     st.subheader("📈 Evolução dos Indicadores")
     df_historico_completo = carregar_historico(supabase, gestor=gestor_nome)
     
@@ -1541,57 +1674,68 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
             'perc_envio': 'mean'
         }).reset_index()
         
-        fig_csat = criar_grafico_evolucao(df_mensal, 'csat', 'CSAT Médio', '#2ecc71', meta=meta_csat, meta_label=f'Meta: {meta_csat}%')
-        if fig_csat:
-            st.plotly_chart(fig_csat, use_container_width=True)
-        
-        fig_avaliacoes = criar_grafico_evolucao(df_mensal, 'perc_avaliacoes', '% Avaliações Médio', '#3498db', meta=meta_avaliacoes, meta_label=f'Meta: {meta_avaliacoes}%')
-        if fig_avaliacoes:
-            st.plotly_chart(fig_avaliacoes, use_container_width=True)
-        
-        fig_envio = criar_grafico_evolucao(df_mensal, 'perc_envio', '% Envio Médio', '#f39c12', meta=meta_envio, meta_label=f'Meta: {meta_envio}%')
-        if fig_envio:
-            st.plotly_chart(fig_envio, use_container_width=True)
+        fig_evolucao = criar_grafico_evolucao(df_mensal)
+        if fig_evolucao:
+            st.plotly_chart(fig_evolucao, use_container_width=True)
     else:
         st.info("Dados insuficientes para gráficos de evolução. Importe mais meses.")
     
     st.markdown("---")
     
+    # Top Performers e Oportunidades (estilizados)
     col1, col2 = st.columns(2)
+    
     with col1:
         st.subheader("🏆 Top Performers da Equipe")
         top_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True)[:3]
         if top_analistas:
             for i, (nome, dados) in enumerate(top_analistas, 1):
                 medalha = ["🥇", "🥈", "🥉"][i-1]
+                cores = ['#FFD700', '#C0C0C0', '#CD7F32']
                 st.markdown(f"""
-                <div style="background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 5px;">
-                    <b>{medalha} {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
+                <div style="background: var(--background-color, #f0f8ff); 
+                            padding: 12px; border-radius: 8px; margin-bottom: 8px;
+                            border-left: 4px solid {cores[i-1]};
+                            color: var(--text-color, #333);">
+                    <b style="color: {cores[i-1]};">{medalha} {nome}</b><br>
+                    <span style="color: var(--text-secondary, #666);">
+                        CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
+                    </span>
                 </div>
                 """, unsafe_allow_html=True)
+    
     with col2:
         st.subheader("📊 Oportunidades de Melhoria")
         bottom_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'])[:3]
         if bottom_analistas:
             for i, (nome, dados) in enumerate(bottom_analistas, 1):
                 st.markdown(f"""
-                <div style="background: #fff5f5; padding: 10px; border-radius: 8px; margin-bottom: 5px;">
-                    <b>{i}º {nome}</b> - CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
+                <div style="background: var(--background-color, #fff5f5); 
+                            padding: 12px; border-radius: 8px; margin-bottom: 8px;
+                            border-left: 4px solid #e74c3c;
+                            color: var(--text-color, #333);">
+                    <b>{i}º {nome}</b><br>
+                    <span style="color: var(--text-secondary, #666);">
+                        CSAT: {dados['csat']:.2f}% | Avaliações: {dados['perc_avaliacoes']:.2f}% | Status: {dados['status']}
+                    </span>
                 </div>
                 """, unsafe_allow_html=True)
     
     st.markdown("---")
     
+    # Tabela de desempenho com Delta Avaliações
     st.subheader("📋 Desempenho da Equipe")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
+        delta_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
         dados_tabela.append({
             'Analista': analista,
             'CSAT': f"{dados['csat']:.2f}%",
             'Meta CSAT': f"{dados['meta_csat']:.0f}%",
-            'Delta': f"{dados['delta_csat']:+.2f}%",
+            'Delta CSAT': f"{dados['delta_csat']:+.2f}%",
             '% Avaliações': f"{dados['perc_avaliacoes']:.2f}%",
             'Meta Avaliações': f"{dados['meta_geral']:.0f}%",
+            'Delta Avaliações': f"{delta_avaliacoes:+.2f}%",
             '% Envio': f"{dados['perc_envio']:.2f}%",
             '💬 Atendimentos': dados['total_atendimentos'],
             'Status': dados['status']
@@ -1599,11 +1743,29 @@ def dashboard_gestor(periodo, gestor_nome, supabase):
     df_tabela = pd.DataFrame(dados_tabela)
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
+    # Resumo estatístico
+    st.markdown("---")
+    st.subheader("📊 Resumo Estatístico")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Média de Atendimentos", f"{media_atendimentos:.0f}")
+    with col2:
+        st.metric("Maior Atendimentos", f"{max([d['total_atendimentos'] for d in resultados.values()])}")
+    with col3:
+        st.metric("Menor Atendimentos", f"{min([d['total_atendimentos'] for d in resultados.values()])}")
+    with col4:
+        st.metric("Total de Atendimentos", f"{total_atendimentos}")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Média CSAT", f"{csat_medio:.2f}%")
+    with col2:
+        st.metric("Média Avaliações", f"{perc_avaliacoes_medio:.2f}%")
+    with col3:
+        st.metric("Média Envio", f"{perc_envio_medio:.2f}%")
+    
     return resultados
-
-# ============================================
-# DASHBOARD COORDENADOR
-# ============================================
 
 def dashboard_coordenador(periodo, nome_usuario, supabase):
     # Padroniza o periodo
@@ -1657,7 +1819,15 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     st.info(f"📅 Período: {periodo} | 👤 Coordenador: {nome_usuario} | 🏆 Metas Superadas: {metas_superadas}/{total_analistas}")
     st.markdown("---")
     
-    criar_saude_equipe(csat_medio, perc_avaliacoes_medio, perc_envio_medio, meta_csat, meta_avaliacoes, meta_envio)
+    criar_painel_inteligente(
+        csat_medio, 
+        perc_avaliacoes_medio, 
+        perc_envio_medio,
+        metas_superadas, 
+        total_analistas
+    )
+    
+    st.markdown("---")
     
     st.subheader("📈 Evolução dos Indicadores - Operação")
     df_historico_completo = carregar_historico(supabase)
@@ -1669,20 +1839,9 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
             'perc_envio': 'mean'
         }).reset_index()
         
-        fig_csat = criar_grafico_evolucao(df_mensal, 'csat', 'CSAT Médio - Operação', '#2ecc71', meta=meta_csat, meta_label=f'Meta: {meta_csat}%')
-        if fig_csat:
-            st.plotly_chart(fig_csat, use_container_width=True)
-            st.write("")
-        
-        fig_avaliacoes = criar_grafico_evolucao(df_mensal, 'perc_avaliacoes', '% Avaliações Médio - Operação', '#3498db', meta=meta_avaliacoes, meta_label=f'Meta: {meta_avaliacoes}%')
-        if fig_avaliacoes:
-            st.plotly_chart(fig_avaliacoes, use_container_width=True)
-            st.write("")
-        
-        fig_envio = criar_grafico_evolucao(df_mensal, 'perc_envio', '% Envio Médio - Operação', '#f39c12', meta=meta_envio, meta_label=f'Meta: {meta_envio}%')
-        if fig_envio:
-            st.plotly_chart(fig_envio, use_container_width=True)
-            st.write("")
+        fig_evolucao = criar_grafico_evolucao(df_mensal, "Evolução dos Indicadores - Operação")
+        if fig_evolucao:
+            st.plotly_chart(fig_evolucao, use_container_width=True)
     else:
         st.info("Dados insuficientes para gráficos de evolução. Importe mais meses.")
     
@@ -1694,18 +1853,32 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
         top_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True)[:5]
         for i, (nome, dados) in enumerate(top_analistas, 1):
             medalha = ["🥇", "🥈", "🥉", "4º", "5º"][i-1]
+            cores = ['#FFD700', '#C0C0C0', '#CD7F32', '#8B8B8B', '#A9A9A9']
             st.markdown(f"""
-            <div style="background: #f0f8ff; padding: 8px; border-radius: 8px; margin-bottom: 4px;">
-                <b>{medalha} {nome}</b> - CSAT: {dados['csat']:.2f}% | {dados['gestor']} | Status: {dados['status']}
+            <div style="background: var(--background-color, #f0f8ff); 
+                        padding: 10px; border-radius: 8px; margin-bottom: 6px;
+                        border-left: 4px solid {cores[i-1] if i <= 3 else '#8B8B8B'};
+                        color: var(--text-color, #333);">
+                <b style="color: {cores[i-1] if i <= 3 else '#8B8B8B'};">{medalha} {nome}</b><br>
+                <span style="color: var(--text-secondary, #666);">
+                    CSAT: {dados['csat']:.2f}% | {dados['gestor']} | Status: {dados['status']}
+                </span>
             </div>
             """, unsafe_allow_html=True)
+    
     with col2:
         st.subheader("📊 Oportunidades - Operação")
         bottom_analistas = sorted(resultados.items(), key=lambda x: x[1]['csat'])[:5]
         for i, (nome, dados) in enumerate(bottom_analistas, 1):
             st.markdown(f"""
-            <div style="background: #fff5f5; padding: 8px; border-radius: 8px; margin-bottom: 4px;">
-                <b>{i}º {nome}</b> - CSAT: {dados['csat']:.2f}% | {dados['gestor']} | Status: {dados['status']}
+            <div style="background: var(--background-color, #fff5f5); 
+                        padding: 10px; border-radius: 8px; margin-bottom: 6px;
+                        border-left: 4px solid #e74c3c;
+                        color: var(--text-color, #333);">
+                <b>{i}º {nome}</b><br>
+                <span style="color: var(--text-secondary, #666);">
+                    CSAT: {dados['csat']:.2f}% | {dados['gestor']} | Status: {dados['status']}
+                </span>
             </div>
             """, unsafe_allow_html=True)
     
@@ -1713,14 +1886,16 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     st.subheader("📋 Desempenho da Operação")
     dados_tabela = []
     for analista, dados in sorted(resultados.items(), key=lambda x: x[1]['csat'], reverse=True):
+        delta_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
         dados_tabela.append({
             'Analista': analista,
             'Gestor': dados['gestor'],
             'CSAT': f"{dados['csat']:.2f}%",
             'Meta CSAT': f"{dados['meta_csat']:.0f}%",
-            'Delta': f"{dados['delta_csat']:+.2f}%",
+            'Delta CSAT': f"{dados['delta_csat']:+.2f}%",
             '% Avaliações': f"{dados['perc_avaliacoes']:.2f}%",
             'Meta Avaliações': f"{dados['meta_geral']:.0f}%",
+            'Delta Avaliações': f"{delta_avaliacoes:+.2f}%",
             '% Envio': f"{dados['perc_envio']:.2f}%",
             '💬 Atendimentos': dados['total_atendimentos'],
             'Status': dados['status']
@@ -1728,10 +1903,32 @@ def dashboard_coordenador(periodo, nome_usuario, supabase):
     df_tabela = pd.DataFrame(dados_tabela)
     st.dataframe(df_tabela, use_container_width=True, hide_index=True)
     
+    # Resumo estatístico
+    st.markdown("---")
+    st.subheader("📊 Resumo Estatístico - Operação")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Média de Atendimentos", f"{media_atendimentos:.0f}")
+    with col2:
+        st.metric("Maior Atendimentos", f"{max([d['total_atendimentos'] for d in resultados.values()])}")
+    with col3:
+        st.metric("Menor Atendimentos", f"{min([d['total_atendimentos'] for d in resultados.values()])}")
+    with col4:
+        st.metric("Total de Atendimentos", f"{total_atendimentos}")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Média CSAT", f"{csat_medio:.2f}%")
+    with col2:
+        st.metric("Média Avaliações", f"{perc_avaliacoes_medio:.2f}%")
+    with col3:
+        st.metric("Média Envio", f"{perc_envio_medio:.2f}%")
+    
     return resultados
 
 # ============================================
-# FUNCOES DE RELATORIOS
+# FUNCOES DE RELATORIOS - COM SARI (NÃO SIARE)
 # ============================================
 
 def gerar_analise_tecnica(analista, dados, media_operacao, podio):
@@ -1794,7 +1991,7 @@ O volume total de atendimentos realizados pelo(a) {genero} foi de **{dados['tota
 - **Destaque:** {posicao} do mês em CSAT.
 """
 
-def gerar_feedback_manual(analista, dados, media_operacao, posicao_podio=None, modo_feedback="SIARE - Desenvolvimento"):
+def gerar_feedback_manual(analista, dados, media_operacao, posicao_podio=None, modo_feedback="SARI - Desenvolvimento"):
     """Gera feedback manual baseado no modo selecionado"""
     genero = get_genero_neutro(analista)
     texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!" if posicao_podio else ""
@@ -1802,7 +1999,7 @@ def gerar_feedback_manual(analista, dados, media_operacao, posicao_podio=None, m
     if modo_feedback == "MIMO - Operacional":
         return _gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio, genero, texto_podio)
     else:
-        return _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero, texto_podio)
+        return _gerar_feedback_sari(analista, dados, media_operacao, posicao_podio, genero, texto_podio)
 
 def _gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio, genero, texto_podio):
     """Gera feedback no formato MIMO (Operacional)"""
@@ -1868,8 +2065,8 @@ def _gerar_feedback_mimo(analista, dados, media_operacao, posicao_podio, genero,
 **Data:** {datetime.now().strftime('%d/%m/%Y')}
 """
 
-def _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero, texto_podio):
-    """Gera feedback no formato SIARE (Desenvolvimento)"""
+def _gerar_feedback_sari(analista, dados, media_operacao, posicao_podio, genero, texto_podio):
+    """Gera feedback no formato SARI (Desenvolvimento) - substituindo SIARE"""
     
     # ===== 1. SITUAÇÃO =====
     situacao = f"No período analisado, o(a) {genero} {analista} apresentou CSAT de {dados['csat']:.2f}% (meta: {dados['meta_csat']:.0f}%), "
@@ -1877,16 +2074,7 @@ def _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero
     situacao += f"e {dados['total_atendimentos']} atendimentos realizados. "
     situacao += f"O percentual de envio foi de {dados['perc_envio']:.2f}%. {texto_podio}"
     
-    # ===== 2. IMPACTO =====
-    impacto = f"O desempenho do(a) {genero} impactou diretamente a experiência do cliente e os resultados da operação. "
-    impacto += f"Com {dados['positivos']} avaliações positivas e apenas {dados['negativos']} negativas, "
-    impacto += f"o índice de satisfação demonstra "
-    if dados['csat'] >= 90:
-        impacto += "alta qualidade no atendimento prestado."
-    else:
-        impacto += "oportunidades de melhoria no atendimento prestado."
-    
-    # ===== 3. ANÁLISE =====
+    # ===== 2. ANÁLISE =====
     if dados['delta_csat'] > 0:
         analise_csat = f"superou a meta em {dados['delta_csat']:.2f} pontos percentuais"
     elif dados['delta_csat'] < 0:
@@ -1902,7 +2090,7 @@ def _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero
     
     analise = f"**CSAT:** O resultado {analise_csat}.\n\n**Avaliações:** A taxa de coleta {analise_avaliacoes}."
     
-    # ===== 4. RECOMENDAÇÃO =====
+    # ===== 3. RECOMENDAÇÃO =====
     if dados['csat'] < dados['meta_csat']:
         recomendacao = "1. Realizar análise aprofundada dos atendimentos negativos\n"
         recomendacao += "2. Identificar padrões de insatisfação recorrentes\n"
@@ -1916,7 +2104,15 @@ def _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero
         recomendacao += "2. Buscar certificações e treinamentos avançados\n"
         recomendacao += "3. Atuar como mentor para novos colaboradores"
     
-    # ===== 5. EXPECTATIVA =====
+    # ===== 4. IMPACTO E EXPECTATIVA =====
+    impacto = f"O desempenho do(a) {genero} impactou diretamente a experiência do cliente e os resultados da operação. "
+    impacto += f"Com {dados['positivos']} avaliações positivas e apenas {dados['negativos']} negativas, "
+    impacto += f"o índice de satisfação demonstra "
+    if dados['csat'] >= 90:
+        impacto += "alta qualidade no atendimento prestado."
+    else:
+        impacto += "oportunidades de melhoria no atendimento prestado."
+    
     expectativa = f"Para o próximo período, espera-se que o(a) {genero} "
     if dados['csat'] >= dados['meta_csat']:
         expectativa += "mantenha o CSAT acima da meta, "
@@ -1935,20 +2131,20 @@ def _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero
 
 {situacao}
 
-### 2. IMPACTO
-
-{impacto}
-
-### 3. ANÁLISE
+### 2. ANÁLISE
 
 {analise}
 
-### 4. RECOMENDAÇÃO
+### 3. RECOMENDAÇÃO
 
 {recomendacao}
 
-### 5. EXPECTATIVA
+### 4. IMPACTO E EXPECTATIVA
 
+**Impacto:**
+{impacto}
+
+**Expectativa:**
 {expectativa}
 
 ---
@@ -1957,8 +2153,8 @@ def _gerar_feedback_siare(analista, dados, media_operacao, posicao_podio, genero
 **Data:** {datetime.now().strftime('%d/%m/%Y')}
 """
 
-def gerar_feedback_ia(analista, dados, media_operacao, posicao_podio=None, feedback_editado=None, modo_feedback="SIARE - Desenvolvimento"):
-    """Gera feedback usando IA com base no modelo selecionado (MIMO ou SIARE)"""
+def gerar_feedback_ia(analista, dados, media_operacao, posicao_podio=None, feedback_editado=None, modo_feedback="SARI - Desenvolvimento"):
+    """Gera feedback usando IA com base no modelo selecionado (MIMO ou SARI)"""
     genero = get_genero_neutro(analista)
     texto_podio = f"🏆 {posicao_podio}º lugar no pódio do mês!" if posicao_podio else "Não está no pódio"
     
@@ -1966,7 +2162,7 @@ def gerar_feedback_ia(analista, dados, media_operacao, posicao_podio=None, feedb
     if "MIMO" in modo_feedback:
         prompt = _construir_prompt_mimo(analista, dados, media_operacao, genero, texto_podio, feedback_editado)
     else:
-        prompt = _construir_prompt_siare(analista, dados, media_operacao, genero, texto_podio, feedback_editado)
+        prompt = _construir_prompt_sari(analista, dados, media_operacao, genero, texto_podio, feedback_editado)
     
     try:
         github_token = st.secrets.get("GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
@@ -2040,8 +2236,8 @@ O feedback deve ser curto, objetivo e focado em ações práticas.
 Gere o feedback:
 """
 
-def _construir_prompt_siare(analista, dados, media_operacao, genero, texto_podio, feedback_editado):
-    """Constrói prompt para o modo SIARE"""
+def _construir_prompt_sari(analista, dados, media_operacao, genero, texto_podio, feedback_editado):
+    """Constrói prompt para o modo SARI (substituindo SIARE)"""
     
     base_prompt = f"""
 Você é um especialista em gestão de performance e desenvolvimento de equipes de atendimento ao cliente.
@@ -2059,14 +2255,13 @@ Você é um especialista em gestão de performance e desenvolvimento de equipes 
 - Status: {dados['status']}
 - Posição no pódio: {texto_podio}
 
-## ESTRUTURA OBRIGATÓRIA DO FEEDBACK (SIARE - DESENVOLVIMENTO):
+## ESTRUTURA OBRIGATÓRIA DO FEEDBACK (SARI - DESENVOLVIMENTO):
 ### 1. SITUAÇÃO (contexto atual do colaborador)
-### 2. IMPACTO (consequências do desempenho)
-### 3. ANÁLISE (causas e fatores do desempenho)
-### 4. RECOMENDAÇÃO (ações específicas para evolução)
-### 5. EXPECTATIVA (resultados esperados para o próximo período)
+### 2. ANÁLISE (causas e fatores do desempenho)
+### 3. RECOMENDAÇÃO (ações específicas para evolução)
+### 4. IMPACTO E EXPECTATIVA (consequências e resultados esperados)
 
-## CARACTERÍSTICAS DO FEEDBACK SIARE:
+## CARACTERÍSTICAS DO FEEDBACK SARI:
 - Feedback aprofundado e estruturado
 - Foco em desenvolvimento de pessoas
 - Conexão entre comportamento e resultado
@@ -2080,13 +2275,13 @@ Você é um especialista em gestão de performance e desenvolvimento de equipes 
 {feedback_editado}
 
 ## INSTRUÇÃO:
-Analise o feedback acima e melhore/ajuste seguindo a estrutura SIARE obrigatória.
+Analise o feedback acima e melhore/ajuste seguindo a estrutura SARI obrigatória.
 Gere o feedback revisado e aprimorado:
 """
     else:
         return base_prompt + """
 ## INSTRUÇÃO:
-Gere um feedback completo de performance seguindo a estrutura SIARE (Situação, Impacto, Análise, Recomendação, Expectativa).
+Gere um feedback completo de performance seguindo a estrutura SARI (Situação, Análise, Recomendação, Impacto e Expectativa).
 O feedback deve ser aprofundado, construtivo e focado no desenvolvimento do colaborador.
 
 Gere o feedback:
@@ -2152,14 +2347,15 @@ def gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_opera
 
 # Mantido para compatibilidade com código existente
 def gerar_feedback_ia_old(analista, dados, media_operacao, posicao_podio=None, feedback_editado=None):
-    """Versão antiga para compatibilidade - usa SIARE como padrão"""
-    return gerar_feedback_ia(analista, dados, media_operacao, posicao_podio, feedback_editado, "SIARE - Desenvolvimento")
+    """Versão antiga para compatibilidade - usa SARI como padrão"""
+    return gerar_feedback_ia(analista, dados, media_operacao, posicao_podio, feedback_editado, "SARI - Desenvolvimento")
 
 # ============================================
-# FUNCOES DE PAINEL E GRAFICO MENSAL
+# FUNCOES DE PAINEL E GRAFICO MENSAL - REFATORADAS
 # ============================================
 
 def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
+    """Gráfico de evolução individual - substitui o gauge"""
     if dados_mensais is None or dados_mensais.empty:
         return None
     
@@ -2172,53 +2368,80 @@ def gerar_grafico_mensal(analista, dados_mensais, meta_csat, meta_avaliacoes):
     df_analista['mes_ano_ordem'] = df_analista['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
     df_analista = df_analista.sort_values('mes_ano_ordem')
     
-    fig = px.line(df_analista, x='mes_ano', y='csat', title=f'📈 Evolução Mensal - {analista}', labels={'mes_ano': 'Período', 'csat': 'CSAT (%)'}, markers=True)
-    fig.update_traces(line=dict(color='#2ecc71', width=3), marker=dict(size=10), name='CSAT Alcançado')
-    fig.add_trace(go.Bar(x=df_analista['mes_ano'], y=df_analista['perc_avaliacoes'], name='% Avaliações', marker_color='#3498db', opacity=0.6, yaxis='y2'))
-    fig.add_trace(go.Scatter(x=df_analista['mes_ano'], y=[meta_csat]*len(df_analista), name=f'Meta CSAT: {meta_csat}%', line=dict(color='#e74c3c', width=2, dash='dash'), mode='lines'))
-    fig.add_trace(go.Scatter(x=df_analista['mes_ano'], y=[meta_avaliacoes]*len(df_analista), name=f'Meta Avaliações: {meta_avaliacoes}%', line=dict(color='#f39c12', width=2, dash='dot'), mode='lines', yaxis='y2'))
+    fig = go.Figure()
+    
+    # CSAT
+    fig.add_trace(go.Scatter(
+        x=df_analista['mes_ano'], 
+        y=df_analista['csat'], 
+        mode='lines+markers',
+        name='CSAT',
+        line=dict(color='#2ecc71', width=3),
+        marker=dict(size=10, color='#2ecc71')
+    ))
+    
+    # % Avaliações
+    fig.add_trace(go.Bar(
+        x=df_analista['mes_ano'], 
+        y=df_analista['perc_avaliacoes'], 
+        name='% Avaliações',
+        marker_color='#3498db',
+        opacity=0.6,
+        yaxis='y2'
+    ))
+    
+    # Metas
+    fig.add_trace(go.Scatter(
+        x=df_analista['mes_ano'], 
+        y=[meta_csat]*len(df_analista), 
+        name=f'Meta CSAT: {meta_csat}%',
+        line=dict(color='#e74c3c', width=2, dash='dash'),
+        mode='lines'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=df_analista['mes_ano'], 
+        y=[meta_avaliacoes]*len(df_analista), 
+        name=f'Meta Avaliações: {meta_avaliacoes}%',
+        line=dict(color='#f39c12', width=2, dash='dot'),
+        mode='lines',
+        yaxis='y2'
+    ))
     
     fig.update_layout(
+        title=f"📈 Evolução Mensal - {analista}",
         xaxis_title='Período',
-        xaxis=dict(
-            title_font=dict(color='#e0e0e0', size=13),
-            tickfont=dict(color='#e0e0e0', size=12),
-            gridcolor='rgba(255,255,255,0.05)'
-        ),
         yaxis=dict(
             title='CSAT (%)',
             range=[0, 100],
             side='left',
-            title_font=dict(color='#e0e0e0', size=13),
-            tickfont=dict(color='#e0e0e0', size=12),
-            gridcolor='rgba(255,255,255,0.1)'
+            gridcolor='rgba(128,128,128,0.15)'
         ),
         yaxis2=dict(
             title='% Avaliações',
             range=[0, 100],
             overlaying='y',
             side='right',
-            title_font=dict(color='#e0e0e0', size=13),
-            tickfont=dict(color='#e0e0e0', size=12),
-            gridcolor='rgba(255,255,255,0.05)'
+            gridcolor='rgba(128,128,128,0.05)'
         ),
         hovermode='x unified',
         legend=dict(
             orientation='h',
             yanchor='bottom',
-            y=-0.3,
+            y=-0.2,
             xanchor='center',
-            x=0.5,
-            font=dict(color='#e0e0e0', size=12)
+            x=0.5
         ),
         height=450,
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#e0e0e0', size=13)
+        font=dict(color='var(--text-color, #e0e0e0)')
     )
+    
     return fig
 
 def criar_painel_analista(analista, dados, media_operacao, podio):
+    """Painel individual do analista - com radar melhorado e gráfico de evolução"""
     posicao_podio = None
     for i, (nome, _, _, _) in enumerate(podio, 1):
         if nome == analista:
@@ -2227,15 +2450,18 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
     
     st.subheader(f"📊 Painel de Performance - {analista}")
     
+    # Cards individuais
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         delta_csat = dados['delta_csat']
         cor_delta = "green" if delta_csat >= 0 else "red"
         st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};">
-            <p style="font-size: 12px; color: #666; margin: 0;">⭐ CSAT</p>
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    text-align: center; border-left: 4px solid {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};
+                    color: var(--text-color, #333);">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">⭐ CSAT</p>
             <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['csat'] >= dados['meta_csat'] else '#dc3545'};">{dados['csat']:.1f}%</p>
-            <p style="font-size: 11px; color: #666; margin: 0;">Meta: {dados['meta_csat']}%</p>
+            <p style="font-size: 11px; color: var(--text-secondary, #666); margin: 0;">Meta: {dados['meta_csat']}%</p>
             <p style="font-size: 14px; color: {cor_delta}; margin: 0;">{delta_csat:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
@@ -2243,29 +2469,35 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
         cor_diff = "green" if diff_avaliacoes >= 0 else "red"
         st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};">
-            <p style="font-size: 12px; color: #666; margin: 0;">📊 % Avaliações</p>
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    text-align: center; border-left: 4px solid {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};
+                    color: var(--text-color, #333);">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">📊 % Avaliações</p>
             <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: {'#28a745' if dados['perc_avaliacoes'] >= dados['meta_geral'] else '#dc3545'};">{dados['perc_avaliacoes']:.1f}%</p>
-            <p style="font-size: 11px; color: #666; margin: 0;">Meta: {dados['meta_geral']}%</p>
+            <p style="font-size: 11px; color: var(--text-secondary, #666); margin: 0;">Meta: {dados['meta_geral']}%</p>
             <p style="font-size: 14px; color: {cor_diff}; margin: 0;">{diff_avaliacoes:+.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #17a2b8;">
-            <p style="font-size: 12px; color: #666; margin: 0;">📤 % Envio</p>
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    text-align: center; border-left: 4px solid #17a2b8;
+                    color: var(--text-color, #333);">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">📤 % Envio</p>
             <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: #17a2b8;">{dados['perc_envio']:.1f}%</p>
-            <p style="font-size: 11px; color: #666; margin: 0;">Clientes não avaliaram</p>
+            <p style="font-size: 11px; color: var(--text-secondary, #666); margin: 0;">Clientes não avaliaram</p>
         </div>
         """, unsafe_allow_html=True)
     with col4:
         diff_atend = dados['total_atendimentos'] - media_operacao
         cor_atend = "green" if diff_atend >= 0 else "red"
         st.markdown(f"""
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #6c757d;">
-            <p style="font-size: 12px; color: #666; margin: 0;">💬 Atendimentos</p>
+        <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                    text-align: center; border-left: 4px solid #6c757d;
+                    color: var(--text-color, #333);">
+            <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">💬 Atendimentos</p>
             <p style="font-size: 34px; font-weight: bold; margin: 5px 0; color: #6c757d;">{dados['total_atendimentos']}</p>
-            <p style="font-size: 11px; color: #666; margin: 0;">Média: {media_operacao}</p>
+            <p style="font-size: 11px; color: var(--text-secondary, #666); margin: 0;">Média: {media_operacao}</p>
             <p style="font-size: 14px; color: {cor_atend}; margin: 0;">{diff_atend:+.0f}</p>
         </div>
         """, unsafe_allow_html=True)
@@ -2274,26 +2506,33 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
             medalha = ["🥇", "🥈", "🥉"][posicao_podio-1]
             cores = ['#FFD700', '#C0C0C0', '#CD7F32']
             st.markdown(f"""
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid {cores[posicao_podio-1]};">
-                <p style="font-size: 12px; color: #666; margin: 0;">🏆 Ranking</p>
+            <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                        text-align: center; border-left: 4px solid {cores[posicao_podio-1]};
+                        color: var(--text-color, #333);">
+                <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">🏆 Ranking</p>
                 <p style="font-size: 40px; margin: 0;">{medalha}</p>
                 <p style="font-size: 16px; font-weight: bold; margin: 5px 0; color: {cores[posicao_podio-1]};">{posicao_podio}º Lugar</p>
-                <p style="font-size: 12px; color: #666; margin: 0;">Pódio do Mês</p>
+                <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">Pódio do Mês</p>
             </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown(f"""
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #6c757d;">
-                <p style="font-size: 12px; color: #666; margin: 0;">🏆 Ranking</p>
+            <div style="background: var(--background-color, #f8f9fa); padding: 15px; border-radius: 10px; 
+                        text-align: center; border-left: 4px solid #6c757d;
+                        color: var(--text-color, #333);">
+                <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">🏆 Ranking</p>
                 <p style="font-size: 28px; margin: 5px 0;">📋</p>
                 <p style="font-size: 14px; font-weight: bold; margin: 5px 0; color: #6c757d;">Não está no pódio</p>
-                <p style="font-size: 12px; color: #666; margin: 0;">Meta: CSAT ≥ 90%</p>
+                <p style="font-size: 12px; color: var(--text-secondary, #666); margin: 0;">Meta: CSAT ≥ 90%</p>
             </div>
             """, unsafe_allow_html=True)
     
     st.markdown("---")
+    
+    # Radar melhorado - apenas percentuais comparáveis
     col1, col2 = st.columns(2)
     with col1:
+        # Gráfico de barras CSAT vs Meta
         fig_barras = go.Figure()
         fig_barras.add_trace(go.Bar(
             x=['CSAT'], 
@@ -2316,66 +2555,33 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         fig_barras.update_layout(
             title=dict(
                 text='CSAT - Resultado vs Meta',
-                font=dict(size=18, color='#e0e0e0')
+                font=dict(size=18, color='var(--text-color, #e0e0e0)')
             ),
             yaxis_title=dict(
                 text='Percentual (%)',
-                font=dict(size=14, color='#e0e0e0')
+                font=dict(size=14, color='var(--text-color, #e0e0e0)')
             ),
             yaxis=dict(
                 range=[0, 100],
-                tickfont=dict(size=12, color='#e0e0e0'),
-                gridcolor='rgba(255,255,255,0.1)'
+                tickfont=dict(size=12, color='var(--text-color, #e0e0e0)'),
+                gridcolor='rgba(128,128,128,0.15)'
             ),
             xaxis=dict(
-                tickfont=dict(size=12, color='#e0e0e0'),
-                gridcolor='rgba(255,255,255,0.05)'
+                tickfont=dict(size=12, color='var(--text-color, #e0e0e0)')
             ),
-            height=480,
-            showlegend=False,
+            height=380,
+            showlegend=True,
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#e0e0e0', size=13)
+            font=dict(color='var(--text-color, #e0e0e0)', size=13)
         )
         st.plotly_chart(fig_barras, use_container_width=True)
-        
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number+delta",
-            value=dados['csat'],
-            delta={'reference': dados['meta_csat']},
-            title={'text': "CSAT", 'font': {'size': 16, 'color': '#e0e0e0'}},
-            number={'font': {'size': 24, 'color': '#e0e0e0'}},
-            gauge={
-                'axis': {'range': [None, 100], 'tickfont': {'size': 12, 'color': '#e0e0e0'}},
-                'bar': {'color': "#2ecc71" if dados['csat'] >= dados['meta_csat'] else "#e74c3c"},
-                'steps': [
-                    {'range': [0, dados['meta_csat']], 'color': "rgba(231, 76, 60, 0.3)"},
-                    {'range': [dados['meta_csat'], 100], 'color': "rgba(46, 204, 113, 0.3)"}
-                ],
-                'threshold': {
-                    'line': {'color': "red", 'width': 4},
-                    'thickness': 0.75,
-                    'value': dados['meta_csat']
-                }
-            }
-        ))
-        fig_gauge.update_layout(
-            height=320,
-            font=dict(color='#e0e0e0', size=13),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_gauge, use_container_width=True)
     
     with col2:
-        categorias = ['CSAT', '% Avaliações', '% Envio', 'Atendimentos']
-        csat_norm = dados['csat']
-        avaliacoes_norm = dados['perc_avaliacoes']
-        envio_norm = dados['perc_envio']
-        atend_norm = min(100, (dados['total_atendimentos'] / media_operacao) * 100) if media_operacao > 0 else 0
-        
-        valores_analista = [csat_norm, avaliacoes_norm, envio_norm, atend_norm]
-        valores_meta = [dados['meta_csat'], dados['meta_geral'], 50, 100]
+        # Radar APENAS com percentuais (sem atendimentos)
+        categorias = ['CSAT', '% Avaliações', '% Envio']
+        valores_analista = [dados['csat'], dados['perc_avaliacoes'], dados['perc_envio']]
+        valores_meta = [dados['meta_csat'], dados['meta_geral'], 80]
         
         fig_radar = go.Figure()
         fig_radar.add_trace(go.Scatterpolar(
@@ -2398,21 +2604,21 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
         fig_radar.update_layout(
             title=dict(
                 text='Radar de Performance',
-                font=dict(size=18, color='#e0e0e0')
+                font=dict(size=18, color='var(--text-color, #e0e0e0)')
             ),
             polar=dict(
                 radialaxis=dict(
                     visible=True,
                     range=[0, 100],
-                    tickfont=dict(size=12, color='#e0e0e0'),
-                    gridcolor='rgba(255,255,255,0.1)'
+                    tickfont=dict(size=12, color='var(--text-color, #e0e0e0)'),
+                    gridcolor='rgba(128,128,128,0.15)'
                 ),
                 angularaxis=dict(
-                    tickfont=dict(size=12, color='#e0e0e0'),
-                    gridcolor='rgba(255,255,255,0.05)'
+                    tickfont=dict(size=12, color='var(--text-color, #e0e0e0)'),
+                    gridcolor='rgba(128,128,128,0.05)'
                 )
             ),
-            height=480,
+            height=380,
             showlegend=True,
             legend=dict(
                 orientation='h',
@@ -2420,11 +2626,11 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
                 y=-0.15,
                 xanchor='center',
                 x=0.5,
-                font=dict(color='#e0e0e0', size=12)
+                font=dict(color='var(--text-color, #e0e0e0)', size=12)
             ),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#e0e0e0', size=13)
+            font=dict(color='var(--text-color, #e0e0e0)', size=13)
         )
         st.plotly_chart(fig_radar, use_container_width=True)
     
@@ -2434,6 +2640,7 @@ def criar_painel_analista(analista, dados, media_operacao, podio):
 def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, supabase, gestor_ativo, acesso_total):
     posicao_podio = criar_painel_analista(analista, dados, media_operacao, podio)
     
+    # Gráfico de evolução individual (substitui o gauge)
     if supabase:
         if acesso_total:
             df_historico_analista = carregar_historico(supabase, analista=analista)
@@ -2457,7 +2664,7 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
         with col1:
             modo_feedback = st.radio(
                 "📋 Formato do Feedback:",
-                options=["SIARE - Desenvolvimento", "MIMO - Operacional"],
+                options=["SARI - Desenvolvimento", "MIMO - Operacional"],
                 index=0,
                 horizontal=True,
                 key="modo_feedback_selector"
@@ -2546,7 +2753,7 @@ def gerar_relatorio_individual(analista, dados, media_operacao, podio, periodo, 
         st.download_button(label="📥 Baixar Relatório Completo (Word)", data=gerar_relatorio_word(analista, dados, analise_tecnica, feedback, media_operacao, podio, periodo), file_name=f"Relatorio_Completo_{analista.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 # ============================================
-# NOVAS FUNCOES DE NAVEGACAO
+# PAGINAS DO SISTEMA
 # ============================================
 
 def pagina_importar_periodo():
@@ -2570,7 +2777,7 @@ def pagina_importar_periodo():
     
     st.markdown("---")
     
-    # ===== SELETORES DE MES E ANO (SUBSTITUI O TEXTO LIVRE) =====
+    # ===== SELETORES DE MES E ANO =====
     col1, col2 = st.columns(2)
     with col1:
         meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
@@ -2775,21 +2982,11 @@ def pagina_historico():
                 'perc_envio': 'mean'
             }).reset_index()
             
-            meses_ordenados = ordenar_meses(df_agrupado['mes_ano'].unique().tolist())
-            df_agrupado['ordem'] = df_agrupado['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
-            df_agrupado = df_agrupado.sort_values('ordem')
+            fig_evolucao = criar_grafico_evolucao(df_agrupado, "📈 Evolução Mensal - Histórico")
+            if fig_evolucao:
+                st.plotly_chart(fig_evolucao, use_container_width=True)
             
-            fig_historico = px.line(
-                df_agrupado,
-                x='mes_ano',
-                y=['csat', 'perc_avaliacoes', 'perc_envio'],
-                title='📈 Evolução Mensal',
-                labels={'value': 'Percentual (%)', 'mes_ano': 'Mês/Ano', 'variable': 'Métrica'}
-            )
-            fig_historico.update_layout(height=400)
-            st.plotly_chart(fig_historico, use_container_width=True)
-            
-            # ===== GRAFICO INDIVIDUAL SO QUANDO ANALISTA SELECIONADO =====
+            # Gráfico individual quando analista selecionado
             if analista_filtro != 'Todos':
                 st.subheader(f"📊 Evolução Mensal - {analista_filtro}")
                 df_analista = df_filtrado[df_filtrado['analista'] == analista_filtro]
@@ -3015,6 +3212,10 @@ def pagina_configuracoes():
     elif not supabase:
         st.error("❌ Supabase não configurado.")
 
+# ============================================
+# DASHBOARD PRINCIPAL
+# ============================================
+
 def dashboard_principal():
     """Dashboard principal (tela inicial)"""
     supabase = init_supabase()
@@ -3161,13 +3362,15 @@ def dashboard_principal():
                 cores = ['#FFD700', '#C0C0C0', '#CD7F32']
                 with col:
                     st.markdown(f"""
-                    <div style="text-align: center; padding: 20px; border: 2px solid #444; border-radius: 10px; background-color: rgba(255,255,255,0.05);">
+                    <div style="text-align: center; padding: 20px; border: 2px solid var(--border-color, #444); 
+                                border-radius: 10px; background-color: var(--background-color, rgba(255,255,255,0.05));
+                                color: var(--text-color, #e0e0e0);">
                         <h1 style="font-size: 48px; margin: 0;">{medalha}</h1>
-                        <h3 style="margin: 5px 0; color: #e0e0e0;">{i}º Lugar</h3>
-                        <h2 style="margin: 5px 0; color: #fff;">{nome}</h2>
+                        <h3 style="margin: 5px 0; color: var(--text-color, #e0e0e0);">{i}º Lugar</h3>
+                        <h2 style="margin: 5px 0; color: var(--text-color, #fff);">{nome}</h2>
                         <p style="font-size: 24px; font-weight: bold; margin: 5px 0; color: {cores[i-1]};">{csat:.2f}%</p>
-                        <p style="margin: 5px 0; color: #ccc;">CSAT</p>
-                        <p style="margin: 5px 0; font-size: 16px; color: #aaa;">💬 {atendimentos} atendimentos</p>
+                        <p style="margin: 5px 0; color: var(--text-secondary, #ccc);">CSAT</p>
+                        <p style="margin: 5px 0; font-size: 16px; color: var(--text-secondary, #aaa);">💬 {atendimentos} atendimentos</p>
                         <p style="margin: 5px 0; font-size: 14px; color: #28a745;">{perc_avaliacoes:.2f}% avaliações</p>
                     </div>
                     """, unsafe_allow_html=True)
@@ -3281,7 +3484,7 @@ def dashboard_principal():
                 )
 
 # ============================================
-# INTERFACE PRINCIPAL
+# MAIN
 # ============================================
 
 def main():
@@ -3336,7 +3539,7 @@ def main():
         pagina_configuracoes()
     
     st.markdown("---")
-    st.markdown('<div style="text-align: center; color: #666; font-size: 12px;">Sistema de Performance v12.0 | Navegação Reorganizada</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; color: var(--text-secondary, #666); font-size: 12px;">Sistema de Performance v13.0 | Refatoração UX/UI</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
