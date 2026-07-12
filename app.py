@@ -36,6 +36,22 @@ GESTOR_POLYANA = "Gestão Polyana Ventura - Chat Outros"
 GESTORES_VALIDOS = [GESTOR_MARCOS, GESTOR_POLYANA]
 
 # ============================================
+# FUNÇÃO AUXILIAR PARA CORES DO TEMA
+# ============================================
+
+def get_theme_colors():
+    """Retorna cores com base no tema ativo (claro/escuro) do Streamlit"""
+    is_dark = st.get_option("theme.base") == "dark"
+    return {
+        "text": "#e0e0e0" if is_dark else "#333333",
+        "background": "#1e1e1e" if is_dark else "#ffffff",
+        "secondary": "#999999" if is_dark else "#666666",
+        "border": "#444444" if is_dark else "#dddddd",
+        "plot_bg": "rgba(0,0,0,0)",
+        "paper_bg": "rgba(0,0,0,0)",
+    }
+
+# ============================================
 # CONFIGURACOES INICIAIS
 # ============================================
 
@@ -1320,24 +1336,37 @@ def calcular_oportunidades(resultados, media_atendimentos):
     return oportunidades[:5]
 
 # ============================================
-# FUNCOES DE DASHBOARD VISUAL
+# FUNCOES DE DASHBOARD VISUAL (CORRIGIDAS - SEM var())
 # ============================================
 
+def get_theme_colors():
+    """Retorna cores com base no tema ativo (claro/escuro) do Streamlit"""
+    is_dark = st.get_option("theme.base") == "dark"
+    return {
+        "text": "#e0e0e0" if is_dark else "#333333",
+        "background": "#1e1e1e" if is_dark else "#ffffff",
+        "secondary": "#999999" if is_dark else "#666666",
+        "border": "#444444" if is_dark else "#dddddd",
+        "plot_bg": "rgba(0,0,0,0)",
+        "paper_bg": "rgba(0,0,0,0)",
+    }
+
 def criar_card_compacto(titulo, valor, meta, subtitulo, cor):
+    theme = get_theme_colors()
     st.markdown(f"""
-    <div style="background: var(--background-color, #ffffff); 
+    <div style="background: {theme['background']}; 
                 padding: 12px; 
                 border-radius: 8px; 
                 border-left: 4px solid {cor};
                 margin-bottom: 8px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 12px; color: var(--text-secondary, #666);">{titulo}</span>
-            <span style="font-size: 20px; font-weight: bold; color: var(--text-color, #333);">{valor}</span>
+            <span style="font-size: 12px; color: {theme['secondary']};">{titulo}</span>
+            <span style="font-size: 20px; font-weight: bold; color: {theme['text']};">{valor}</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-top: 4px;">
-            <span style="font-size: 10px; color: var(--text-secondary, #999);">Meta: {meta}</span>
-            <span style="font-size: 10px; color: var(--text-secondary, #999);">{subtitulo}</span>
+            <span style="font-size: 10px; color: {theme['secondary']};">Meta: {meta}</span>
+            <span style="font-size: 10px; color: {theme['secondary']};">{subtitulo}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1386,6 +1415,7 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
 
 def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_envio_medio, 
                                     metas_superadas, total_analistas):
+    theme = get_theme_colors()
     col1, col2, col3, col4 = st.columns(4)
     
     saude_csat = "🟢" if csat_medio >= 90 else "🟡" if csat_medio >= 85 else "🔴"
@@ -1433,7 +1463,7 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("#### 🔔 Alertas")
+        st.markdown(f"#### 🔔 Alertas")
         alertas = []
         
         if csat_medio < 85:
@@ -1461,7 +1491,7 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
             st.markdown(f"- {alerta}")
     
     with col2:
-        st.markdown("#### 💡 Recomendações")
+        st.markdown(f"#### 💡 Recomendações")
         recomendacoes = []
         
         if csat_medio >= 90 and perc_avaliacoes_medio >= 25:
@@ -1480,6 +1510,7 @@ def criar_grafico_evolucao_unificado(df_historico, titulo="Evolução dos Indica
     if df_historico is None or df_historico.empty:
         return None
     
+    theme = get_theme_colors()
     meses_ordenados = ordenar_meses(df_historico['mes_ano'].unique().tolist())
     df_ordenado = df_historico.copy()
     df_ordenado['ordem'] = df_ordenado['mes_ano'].apply(lambda x: meses_ordenados.index(x) if x in meses_ordenados else 999)
@@ -1558,16 +1589,16 @@ def criar_grafico_evolucao_unificado(df_historico, titulo="Evolução dos Indica
             xanchor='center',
             x=0.5
         ),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='var(--text-color, #e0e0e0)'),
+        plot_bgcolor=theme['plot_bg'],
+        paper_bgcolor=theme['paper_bg'],
+        font=dict(color=theme['text']),
         xaxis=dict(
             gridcolor='rgba(128,128,128,0.15)',
-            tickfont=dict(color='var(--text-color, #e0e0e0)')
+            tickfont=dict(color=theme['text'])
         ),
         yaxis=dict(
             gridcolor='rgba(128,128,128,0.15)',
-            tickfont=dict(color='var(--text-color, #e0e0e0)')
+            tickfont=dict(color=theme['text'])
         )
     )
     
@@ -1577,6 +1608,7 @@ def gerar_grafico_mensal(analista, df_historico, meta_csat, meta_avaliacoes):
     if df_historico is None or df_historico.empty:
         return None
     
+    theme = get_theme_colors()
     df_analista = df_historico[df_historico['analista'] == analista]
     if df_analista.empty or len(df_analista['mes_ano'].unique()) < 2:
         return None
@@ -1631,14 +1663,16 @@ def gerar_grafico_mensal(analista, df_historico, meta_csat, meta_avaliacoes):
             title='CSAT (%)',
             range=[0, 100],
             side='left',
-            gridcolor='rgba(128,128,128,0.15)'
+            gridcolor='rgba(128,128,128,0.15)',
+            tickfont=dict(color=theme['text'])
         ),
         yaxis2=dict(
             title='% Avaliações',
             range=[0, 100],
             overlaying='y',
             side='right',
-            gridcolor='rgba(128,128,128,0.05)'
+            gridcolor='rgba(128,128,128,0.05)',
+            tickfont=dict(color=theme['text'])
         ),
         hovermode='x unified',
         legend=dict(
@@ -1648,9 +1682,9 @@ def gerar_grafico_mensal(analista, df_historico, meta_csat, meta_avaliacoes):
             xanchor='center',
             x=0.5
         ),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='var(--text-color, #e0e0e0)')
+        plot_bgcolor=theme['plot_bg'],
+        paper_bgcolor=theme['paper_bg'],
+        font=dict(color=theme['text'])
     )
     
     return fig
@@ -1660,6 +1694,7 @@ def mostrar_podio(podio):
         st.info("🏆 Nenhum analista no pódio este mês")
         return
     
+    theme = get_theme_colors()
     col1, col2, col3 = st.columns(3)
     medalhas = ["🥇", "🥈", "🥉"]
     cores = ['#FFD700', '#C0C0C0', '#CD7F32']
@@ -1667,14 +1702,14 @@ def mostrar_podio(podio):
     for i, (col, (nome, csat, atendimentos, perc_avaliacoes)) in enumerate(zip([col1, col2, col3], podio), 1):
         with col:
             st.markdown(f"""
-            <div style="text-align: center; padding: 15px; border: 2px solid var(--border-color, #444); 
-                        border-radius: 10px; background: var(--background-color, rgba(255,255,255,0.05));
-                        color: var(--text-color, #e0e0e0);">
+            <div style="text-align: center; padding: 15px; border: 2px solid {theme['border']}; 
+                        border-radius: 10px; background: {theme['background']};
+                        color: {theme['text']};">
                 <div style="font-size: 36px;">{medalhas[i-1]}</div>
-                <h4 style="margin: 5px 0; color: var(--text-color, #fff);">{i}º Lugar</h4>
-                <h3 style="margin: 5px 0; color: var(--text-color, #fff);">{nome}</h3>
+                <h4 style="margin: 5px 0; color: {theme['text']};">{i}º Lugar</h4>
+                <h3 style="margin: 5px 0; color: {theme['text']};">{nome}</h3>
                 <div style="font-size: 24px; font-weight: bold; color: {cores[i-1]};">{csat:.1f}%</div>
-                <div style="font-size: 12px; color: var(--text-secondary, #ccc);">💬 {atendimentos} atendimentos</div>
+                <div style="font-size: 12px; color: {theme['secondary']};">💬 {atendimentos} atendimentos</div>
                 <div style="font-size: 12px; color: #28a745;">{perc_avaliacoes:.1f}% avaliações</div>
             </div>
             """, unsafe_allow_html=True)
@@ -1902,11 +1937,12 @@ def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback,
         return None
 
 # ============================================
-# RADAR IMPACTANTE (mantido)
+# RADAR IMPACTANTE (CORRIGIDO - SEM var())
 # ============================================
 
 def criar_radar_impactante(analista, dados):
     """Cria um radar visualmente impactante com cores vibrantes"""
+    theme = get_theme_colors()
     categorias = ['⭐ CSAT', '📝 Avaliações', '📤 Envio']
     valores = [dados['csat'], dados['perc_avaliacoes'], dados['perc_envio']]
     metas = [dados['meta_csat'], dados['meta_geral'], 80]
@@ -1943,7 +1979,7 @@ def criar_radar_impactante(analista, dados):
     fig.update_layout(
         title=dict(
             text=f'🎯 Radar de Performance - {analista}',
-            font=dict(size=18, color='var(--text-color, #ffffff)', weight='bold'),
+            font=dict(size=18, color=theme['text'], weight='bold'),
             x=0.5
         ),
         height=420,
@@ -1953,7 +1989,7 @@ def criar_radar_impactante(analista, dados):
                 range=[0, 100],
                 tickfont=dict(
                     size=11,
-                    color='var(--text-color, #e0e0e0)',
+                    color=theme['text'],
                     weight='bold'
                 ),
                 gridcolor='rgba(128,128,128,0.2)',
@@ -1964,7 +2000,7 @@ def criar_radar_impactante(analista, dados):
             angularaxis=dict(
                 tickfont=dict(
                     size=13,
-                    color='var(--text-color, #ffffff)',
+                    color=theme['text'],
                     weight='bold'
                 ),
                 gridcolor='rgba(128,128,128,0.2)',
@@ -1981,7 +2017,7 @@ def criar_radar_impactante(analista, dados):
             x=0.5,
             font=dict(
                 size=13,
-                color='var(--text-color, #ffffff)',
+                color=theme['text'],
                 weight='bold'
             ),
             bgcolor='rgba(0,0,0,0.3)',
@@ -1990,7 +2026,7 @@ def criar_radar_impactante(analista, dados):
         ),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='var(--text-color, #ffffff)')
+        font=dict(color=theme['text'])
     )
     
     return fig
@@ -2408,17 +2444,17 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                         criterios.append(f"✅ {performer['avaliacoes']:.1f}% ≥ 25%")
                     
                     st.markdown(f"""
-                    <div style="background: var(--background-color, #f0f8ff); 
+                    <div style="background: {get_theme_colors()['background']}; 
                                 padding: 12px; border-radius: 8px; margin-bottom: 8px;
                                 border-left: 4px solid {cores[i-1]};
-                                color: var(--text-color, #333);">
+                                color: {get_theme_colors()['text']};">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <b style="color: {cores[i-1]};">{medalha} {performer['analista']}</b>
                             <span style="font-size: 18px; font-weight: bold; color: {cores[i-1]};">
                                 {performer['csat']:.1f}%
                             </span>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px;">
+                        <div style="font-size: 11px; color: {get_theme_colors()['secondary']}; margin-top: 4px;">
                             {' | '.join(criterios)}
                         </div>
                         <div style="font-size: 11px; color: #28a745; margin-top: 2px;">
@@ -2447,17 +2483,17 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                         status_real = "⚡ Atenção necessária"
                     
                     st.markdown(f"""
-                    <div style="background: var(--background-color, #fff5f5); 
+                    <div style="background: {get_theme_colors()['background']}; 
                                 padding: 12px; border-radius: 8px; margin-bottom: 8px;
                                 border-left: 4px solid {cor};
-                                color: var(--text-color, #333);">
+                                color: {get_theme_colors()['text']};">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <b>{i}º {oport['analista']}</b>
                             <span style="font-size: 16px; font-weight: bold; color: {cor};">
                                 {oport['csat']:.1f}%
                             </span>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px;">
+                        <div style="font-size: 11px; color: {get_theme_colors()['secondary']}; margin-top: 4px;">
                             {' | '.join(oport['motivos'][:2])}
                         </div>
                         <div style="font-size: 11px; color: {cor}; margin-top: 2px;">
@@ -2602,15 +2638,15 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             with col1:
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {'#2ecc71' if dados['csat'] >= dados['meta_csat'] else '#e74c3c'};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {'#2ecc71' if dados['csat'] >= dados['meta_csat'] else '#e74c3c'};">
                         {dados['csat']:.1f}%
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">⭐ CSAT</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Meta: {dados['meta_csat']}%</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">⭐ CSAT</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Meta: {dados['meta_csat']}%</div>
                     <div style="font-size: 12px; color: {'#2ecc71' if dados['delta_csat'] >= 0 else '#e74c3c'};">
                         {dados['delta_csat']:+.1f}%
                     </div>
@@ -2621,15 +2657,15 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                 diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
                 cor_avaliacoes = "#2ecc71" if diff_avaliacoes >= 0 else "#e74c3c"
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {cor_avaliacoes};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {cor_avaliacoes};">
                         {dados['perc_avaliacoes']:.1f}%
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">📝 Avaliações</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Meta: {dados['meta_geral']}%</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">📝 Avaliações</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Meta: {dados['meta_geral']}%</div>
                     <div style="font-size: 12px; color: {cor_avaliacoes};">
                         {diff_avaliacoes:+.1f}%
                     </div>
@@ -2640,15 +2676,15 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                 diff_envio = dados['perc_envio'] - 80
                 cor_envio = "#2ecc71" if diff_envio >= 0 else "#f39c12"
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {cor_envio};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {cor_envio};">
                         {dados['perc_envio']:.1f}%
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">📤 Envio</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Meta: 80%</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">📤 Envio</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Meta: 80%</div>
                     <div style="font-size: 12px; color: {cor_envio};">
                         {diff_envio:+.1f}%
                     </div>
@@ -2659,15 +2695,15 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                 diff_atend = dados['total_atendimentos'] - media_atendimentos
                 cor_atend = "#2ecc71" if diff_atend >= 0 else "#e74c3c"
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {cor_atend};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {cor_atend};">
                         {dados['total_atendimentos']}
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">💬 Atendimentos</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Média: {media_atendimentos:.0f}</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">💬 Atendimentos</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Média: {media_atendimentos:.0f}</div>
                     <div style="font-size: 12px; color: {cor_atend};">
                         {diff_atend:+.0f}
                     </div>
@@ -2956,12 +2992,12 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                 medalha = ["🥇", "🥈", "🥉", "4º", "5º"][i-1]
                 cores = ['#FFD700', '#C0C0C0', '#CD7F32', '#8B8B8B', '#A9A9A9']
                 st.markdown(f"""
-                <div style="background: var(--background-color, #f0f8ff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 8px; border-radius: 6px; margin-bottom: 4px;
                             border-left: 4px solid {cores[i-1] if i <= 3 else '#8B8B8B'};
-                            color: var(--text-color, #333);">
+                            color: {get_theme_colors()['text']};">
                     <b style="color: {cores[i-1] if i <= 3 else '#8B8B8B'};">{medalha} {performer['analista']}</b>
-                    <span style="float: right; color: var(--text-secondary, #666); font-size: 12px;">
+                    <span style="float: right; color: {get_theme_colors()['secondary']}; font-size: 12px;">
                         {performer['status']} | CSAT: {performer['csat']:.1f}%
                     </span>
                 </div>
@@ -2974,12 +3010,12 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
             for i, oport in enumerate(oportunidades[:5], 1):
                 cor = "#e74c3c" if oport['csat'] < 85 else "#f39c12"
                 st.markdown(f"""
-                <div style="background: var(--background-color, #fff5f5); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 8px; border-radius: 6px; margin-bottom: 4px;
                             border-left: 4px solid {cor};
-                            color: var(--text-color, #333);">
+                            color: {get_theme_colors()['text']};">
                     <b>{i}º {oport['analista']}</b>
-                    <span style="float: right; color: var(--text-secondary, #666); font-size: 12px;">
+                    <span style="float: right; color: {get_theme_colors()['secondary']}; font-size: 12px;">
                         CSAT: {oport['csat']:.1f}%
                     </span>
                 </div>
@@ -3107,15 +3143,15 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
             
             with col1:
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {'#2ecc71' if dados['csat'] >= dados['meta_csat'] else '#e74c3c'};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {'#2ecc71' if dados['csat'] >= dados['meta_csat'] else '#e74c3c'};">
                         {dados['csat']:.1f}%
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">⭐ CSAT</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Meta: {dados['meta_csat']}%</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">⭐ CSAT</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Meta: {dados['meta_csat']}%</div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -3123,15 +3159,15 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                 diff_avaliacoes = dados['perc_avaliacoes'] - dados['meta_geral']
                 cor_avaliacoes = "#2ecc71" if diff_avaliacoes >= 0 else "#e74c3c"
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {cor_avaliacoes};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {cor_avaliacoes};">
                         {dados['perc_avaliacoes']:.1f}%
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">📝 Avaliações</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Meta: {dados['meta_geral']}%</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">📝 Avaliações</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Meta: {dados['meta_geral']}%</div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -3139,15 +3175,15 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                 diff_envio = dados['perc_envio'] - 80
                 cor_envio = "#2ecc71" if diff_envio >= 0 else "#f39c12"
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {cor_envio};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {cor_envio};">
                         {dados['perc_envio']:.1f}%
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">📤 Envio</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Meta: 80%</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">📤 Envio</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Meta: 80%</div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -3155,15 +3191,15 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                 diff_atend = dados['total_atendimentos'] - media_atendimentos
                 cor_atend = "#2ecc71" if diff_atend >= 0 else "#e74c3c"
                 st.markdown(f"""
-                <div style="background: var(--background-color, #ffffff); 
+                <div style="background: {get_theme_colors()['background']}; 
                             padding: 15px; border-radius: 10px; 
                             border-left: 4px solid {cor_atend};
                             text-align: center;">
                     <div style="font-size: 28px; font-weight: bold; color: {cor_atend};">
                         {dados['total_atendimentos']}
                     </div>
-                    <div style="font-size: 12px; color: var(--text-secondary, #666);">💬 Atendimentos</div>
-                    <div style="font-size: 10px; color: var(--text-secondary, #999);">Média: {media_atendimentos:.0f}</div>
+                    <div style="font-size: 12px; color: {get_theme_colors()['secondary']};">💬 Atendimentos</div>
+                    <div style="font-size: 10px; color: {get_theme_colors()['secondary']};">Média: {media_atendimentos:.0f}</div>
                 </div>
                 """, unsafe_allow_html=True)
             
