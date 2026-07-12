@@ -21,7 +21,7 @@ import tempfile
 # CONFIGURAÇÃO DO MATPLOTLIB (ANTES DE QUALQUER IMPORT)
 # ============================================
 import matplotlib
-matplotlib.use('Agg')  # Backend não-interativo
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -1339,18 +1339,6 @@ def calcular_oportunidades(resultados, media_atendimentos):
 # FUNCOES DE DASHBOARD VISUAL (CORRIGIDAS - SEM var())
 # ============================================
 
-def get_theme_colors():
-    """Retorna cores com base no tema ativo (claro/escuro) do Streamlit"""
-    is_dark = st.get_option("theme.base") == "dark"
-    return {
-        "text": "#e0e0e0" if is_dark else "#333333",
-        "background": "#1e1e1e" if is_dark else "#ffffff",
-        "secondary": "#999999" if is_dark else "#666666",
-        "border": "#444444" if is_dark else "#dddddd",
-        "plot_bg": "rgba(0,0,0,0)",
-        "paper_bg": "rgba(0,0,0,0)",
-    }
-
 def criar_card_compacto(titulo, valor, meta, subtitulo, cor):
     theme = get_theme_colors()
     st.markdown(f"""
@@ -1415,7 +1403,6 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
 
 def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_envio_medio, 
                                     metas_superadas, total_analistas):
-    theme = get_theme_colors()
     col1, col2, col3, col4 = st.columns(4)
     
     saude_csat = "🟢" if csat_medio >= 90 else "🟡" if csat_medio >= 85 else "🔴"
@@ -1463,7 +1450,7 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown(f"#### 🔔 Alertas")
+        st.markdown("#### 🔔 Alertas")
         alertas = []
         
         if csat_medio < 85:
@@ -1491,7 +1478,7 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
             st.markdown(f"- {alerta}")
     
     with col2:
-        st.markdown(f"#### 💡 Recomendações")
+        st.markdown("#### 💡 Recomendações")
         recomendacoes = []
         
         if csat_medio >= 90 and perc_avaliacoes_medio >= 25:
@@ -2508,13 +2495,99 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
     with tab_ranking:
         st.subheader("🏆 Pódio do Mês")
         
+        # ===== CARREGAR DADOS DO PÓDIO =====
         analistas_excluidos = carregar_exclusoes_podio(supabase, periodo, gestor_nome) if supabase else []
         resultados_para_podio = {k: v for k, v in resultados.items() if k not in analistas_excluidos}
         podio = calcular_podio(resultados_para_podio, media_atendimentos)
         
         podio_manual = carregar_podio_manual(supabase, periodo, gestor_nome) if supabase else None
         podio_efetivo = podio_manual if podio_manual else podio
+        
+        if analistas_excluidos:
+            st.caption(f"ℹ️ {len(analistas_excluidos)} analista(s) excluído(s) do cálculo do pódio.")
+        
+        if podio_manual:
+            st.caption("✏️ Pódio ajustado manualmente pelo gestor")
+        
+        # ===== MOSTRAR PÓDIO =====
         mostrar_podio(podio_efetivo)
+        
+        st.markdown("---")
+        
+        # ===== EDITAR PÓDIO MANUALMENTE =====
+        with st.expander("✏️ Editar Pódio Manualmente", expanded=False):
+            st.markdown("### Excluir analistas do cálculo do pódio")
+            st.caption("Analistas com volume atípico (ex: ajuda ocasional) podem ser removidos da base de cálculo da média e elegibilidade do pódio.")
+            
+            exclusoes_atuais = carregar_exclusoes_podio(supabase, periodo, gestor_nome) if supabase else []
+            
+            analistas_selecionados = st.multiselect(
+                "Selecione os analistas para excluir do cálculo do pódio:",
+                options=list(resultados.keys()),
+                default=exclusoes_atuais,
+                key="multiselect_exclusoes_podio"
+            )
+            
+            if set(analistas_selecionados) != set(exclusoes_atuais):
+                if supabase:
+                    for analista in analistas_selecionados:
+                        if analista not in exclusoes_atuais:
+                            salvar_exclusao_podio(supabase, periodo, gestor_nome, analista)
+                    for analista in exclusoes_atuais:
+                        if analista not in analistas_selecionados:
+                            remover_exclusao_podio(supabase, periodo, gestor_nome, analista)
+                    st.success("✅ Exclusões atualizadas! Recarregando...")
+                    st.rerun()
+            
+            st.markdown("---")
+            
+            st.markdown("### Ajustar pódio manualmente")
+            st.caption("Preencha os três lugares do pódio manualmente. Deixe em branco para não preencher uma posição.")
+            
+            podio_atual = podio_manual if podio_manual else podio
+            podio_manual_edit = []
+            
+            for i in range(3):
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    nome = podio_atual[i][0] if i < len(podio_atual) else ""
+                    nome_edit = st.text_input(f"{i+1}º - Nome do analista", value=nome, key=f"podio_nome_{i}")
+                with col2:
+                    csat = podio_atual[i][1] if i < len(podio_atual) else 0.0
+                    csat_edit = st.number_input(f"CSAT (%)", value=float(csat), key=f"podio_csat_{i}", step=0.1, min_value=0.0, max_value=100.0)
+                with col3:
+                    atend = podio_atual[i][2] if i < len(podio_atual) else 0
+                    atend_edit = st.number_input(f"💬 Atendimentos", value=int(atend), key=f"podio_atend_{i}", step=1, min_value=0)
+                if nome_edit:
+                    podio_manual_edit.append((nome_edit, csat_edit, atend_edit, 0))
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if podio_manual_edit and st.button("💾 Salvar Pódio Manual", use_container_width=True, key="salvar_podio"):
+                    if supabase:
+                        try:
+                            sucesso, mensagem = salvar_podio_manual(supabase, periodo, gestor_nome, podio_manual_edit)
+                            if sucesso:
+                                st.success("✅ Pódio salvo com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Erro: {mensagem}")
+                        except Exception as e:
+                            st.error(f"❌ Erro: {str(e)}")
+                    else:
+                        st.error("❌ Supabase não configurado.")
+            
+            with col2:
+                if st.button("🔄 Resetar Pódio", use_container_width=True, key="resetar_podio"):
+                    if supabase:
+                        try:
+                            supabase.table('podio_manual').delete().eq('mes_ano', periodo).eq('gestor', gestor_nome).execute()
+                            st.success("✅ Pódio resetado com sucesso!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Erro: {str(e)}")
+                    else:
+                        st.error("❌ Supabase não configurado.")
         
         st.markdown("---")
         st.subheader("📊 Ranking Completo")
