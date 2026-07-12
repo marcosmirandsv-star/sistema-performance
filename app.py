@@ -44,7 +44,7 @@ def get_theme_colors():
     try:
         is_dark = st.get_option("theme.base") == "dark"
     except:
-        is_dark = False  # fallback
+        is_dark = False
     return {
         "text": "#e0e0e0" if is_dark else "#333333",
         "background": "#1e1e1e" if is_dark else "#ffffff",
@@ -1369,7 +1369,7 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "👥 Analistas",
             dados.get('total_registros', 0),
-            "-",                     # meta (sem prefixo)
+            "-",
             "Total na equipe",
             "#2ecc71"
         )
@@ -1379,7 +1379,7 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "⭐ CSAT",
             f"{dados.get('csat_medio', 0):.1f}%",
-            f"{meta_csat}%",         # apenas o valor, sem "Meta:"
+            f"{meta_csat}%",
             "✅" if dados.get('csat_medio', 0) >= meta_csat else "⚠️",
             cor_csat
         )
@@ -1389,7 +1389,7 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "📝 Avaliações",
             f"{dados.get('perc_avaliacoes_medio', 0):.1f}%",
-            f"{meta_avaliacoes}%",   # apenas o valor
+            f"{meta_avaliacoes}%",
             "✅" if dados.get('perc_avaliacoes_medio', 0) >= meta_avaliacoes else "⚠️",
             cor_avaliacoes
         )
@@ -1399,18 +1399,16 @@ def criar_cards_indicadores_compactos(dados, meta_csat=90, meta_avaliacoes=25, m
         criar_card_compacto(
             "📤 Envio",
             f"{dados.get('perc_envio_medio', 0):.1f}%",
-            f"{meta_envio}%",        # apenas o valor
+            f"{meta_envio}%",
             "✅" if dados.get('perc_envio_medio', 0) >= meta_envio else "⚠️",
             cor_envio
         )
+
 def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_envio_medio, 
-                                    metas_superadas, total_analistas):
+                                    metas_superadas, total_analistas, media_atendimentos):
     col1, col2, col3, col4 = st.columns(4)
     
-    saude_csat = "🟢" if csat_medio >= 90 else "🟡" if csat_medio >= 85 else "🔴"
-    saude_avaliacoes = "🟢" if perc_avaliacoes_medio >= 25 else "🟡" if perc_avaliacoes_medio >= 20 else "🔴"
-    saude_envio = "🟢" if perc_envio_medio >= 80 else "🟡" if perc_envio_medio >= 70 else "🔴"
-    
+    # ===== CARD 1: Metas Superadas (mantido) =====
     with col1:
         criar_card_compacto(
             "🏆 Metas Superadas",
@@ -1420,33 +1418,80 @@ def criar_painel_inteligente_compacto(csat_medio, perc_avaliacoes_medio, perc_en
             "#2ecc71"
         )
     
+    # ===== CARD 2: Principal Alerta (prioridade: CSAT → Avaliações → Atendimentos) =====
+    alerta_texto = "✅ A equipe está alinhada com os objetivos."
+    cor_alerta = "#2ecc71"
+    
+    if csat_medio < 85:
+        alerta_texto = "A qualidade do atendimento tem espaço para evolução."
+        cor_alerta = "#e74c3c"
+    elif perc_avaliacoes_medio < 20:
+        alerta_texto = "A participação dos clientes nas pesquisas pode ser ampliada."
+        cor_alerta = "#f39c12"
+    elif media_atendimentos is not None and media_atendimentos > 0:
+        # Se houver média de atendimentos, verifica se está abaixo de um limiar (ex: 500)
+        # Ajuste o limiar conforme sua realidade
+        if media_atendimentos < 500:
+            alerta_texto = "O volume de atendimentos merece atenção para equilibrar a equipe."
+            cor_alerta = "#f39c12"
+    
     with col2:
         criar_card_compacto(
-            "⭐ CSAT",
-            f"{saude_csat} {csat_medio:.1f}%",
-            "90%",      # meta sem prefixo
-            "Status",
-            "#2ecc71" if csat_medio >= 90 else "#f39c12" if csat_medio >= 85 else "#e74c3c"
+            "🚨 Principal Alerta",
+            alerta_texto,
+            "-",
+            "Ação",
+            cor_alerta
         )
+    
+    # ===== CARD 3: Principal Ponto Forte =====
+    forte_texto = "A equipe apresenta desempenho equilibrado."
+    cor_forte = "#3498db"
+    
+    # Verifica CSAT
+    if metas_superadas == total_analistas and total_analistas > 0:
+        forte_texto = "A equipe atingiu consistentemente a meta de satisfação."
+        cor_forte = "#2ecc71"
+    elif perc_avaliacoes_medio >= 25:
+        forte_texto = "A coleta de feedbacks está consolidada como prática."
+        cor_forte = "#2ecc71"
+    elif media_atendimentos is not None and media_atendimentos > 700:  # Exemplo de limiar alto
+        forte_texto = "A equipe mantém um volume de atendimentos acima da média."
+        cor_forte = "#2ecc71"
     
     with col3:
         criar_card_compacto(
-            "📝 Avaliações",
-            f"{saude_avaliacoes} {perc_avaliacoes_medio:.1f}%",
-            "25%",      # meta sem prefixo
-            "Status",
-            "#2ecc71" if perc_avaliacoes_medio >= 25 else "#f39c12" if perc_avaliacoes_medio >= 20 else "#e74c3c"
+            "🏆 Principal Ponto Forte",
+            forte_texto,
+            "-",
+            "Destaque",
+            cor_forte
         )
+    
+    # ===== CARD 4: Recomendação =====
+    recomendacao = "Manter as boas práticas e compartilhar aprendizados."
+    cor_recomendacao = "#2ecc71"
+    
+    if csat_medio < 85:
+        recomendacao = "Fortalecer a escuta ativa e a resolução de problemas no atendimento."
+        cor_recomendacao = "#e74c3c"
+    elif perc_avaliacoes_medio < 20:
+        recomendacao = "Reforçar a importância da pesquisa com os clientes ao final de cada interação."
+        cor_recomendacao = "#f39c12"
+    elif media_atendimentos is not None and media_atendimentos < 500:
+        recomendacao = "Revisar a distribuição de demandas para otimizar a produtividade."
+        cor_recomendacao = "#f39c12"
     
     with col4:
         criar_card_compacto(
-            "📤 Envio",
-            f"{saude_envio} {perc_envio_medio:.1f}%",
-            "80%",      # meta sem prefixo
-            "Status",
-            "#2ecc71" if perc_envio_medio >= 80 else "#f39c12" if perc_envio_medio >= 70 else "#e74c3c"
+            "💡 Recomendação",
+            recomendacao,
+            "-",
+            "Próximo passo",
+            cor_recomendacao
         )
     
+    # ===== FOOTER: Alertas e Recomendações detalhadas (mantido) =====
     st.markdown("---")
     
     col1, col2 = st.columns(2)
@@ -2000,7 +2045,8 @@ def criar_radar_impactante(analista, dados):
     )
 
     return fig
-    # ============================================
+
+# ============================================
 # FUNCOES DE FEEDBACK (mantidas)
 # ============================================
 
@@ -2309,7 +2355,7 @@ Gere o feedback:
 """
 
 # ============================================
-# DASHBOARD GESTOR - VERSÃO OTIMIZADA (CORRIGIDA)
+# DASHBOARD GESTOR - VERSÃO OTIMIZADA
 # ============================================
 
 def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
@@ -2363,7 +2409,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
     
     criar_painel_inteligente_compacto(
         csat_medio, perc_avaliacoes_medio, perc_envio_medio,
-        metas_superadas, total_analistas
+        metas_superadas, total_analistas, media_atendimentos
     )
     st.markdown("---")
     
@@ -2882,7 +2928,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # ===== DOWNLOAD DE RELATÓRIOS (CORRIGIDO) =====
+            # ===== DOWNLOAD DE RELATÓRIOS (CORRIGIDO - evita erro com data=None) =====
             st.subheader("📄 Download de Relatórios")
             st.caption("📊 Relatórios com gráficos de performance incluídos")
 
@@ -2958,7 +3004,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
     return resultados
 
 # ============================================
-# DASHBOARD COORDENADOR - VERSÃO OTIMIZADA (CORRIGIDA)
+# DASHBOARD COORDENADOR - VERSÃO OTIMIZADA
 # ============================================
 
 def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
@@ -3012,7 +3058,7 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
     
     criar_painel_inteligente_compacto(
         csat_medio, perc_avaliacoes_medio, perc_envio_medio,
-        metas_superadas, total_analistas
+        metas_superadas, total_analistas, media_atendimentos
     )
     st.markdown("---")
     
