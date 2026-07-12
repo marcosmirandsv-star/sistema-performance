@@ -16,6 +16,8 @@ import calendar
 import bcrypt
 import base64
 import tempfile
+import matplotlib
+matplotlib.use('Agg')  # Backend não-interativo para evitar segmentation fault
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -1672,11 +1674,11 @@ def mostrar_podio(podio):
             """, unsafe_allow_html=True)
 
 # ============================================
-# FUNCOES PARA GRÁFICOS NOS RELATÓRIOS WORD
+# FUNCOES PARA GRÁFICOS NOS RELATÓRIOS WORD (CORRIGIDAS)
 # ============================================
 
 def criar_grafico_barras_word(dados, meta, titulo, cor="#2ecc71"):
-    """Cria um gráfico de barras para o relatório Word"""
+    """Cria gráfico de barras e retorna buffer de imagem"""
     fig, ax = plt.subplots(figsize=(6, 2.5))
     
     bars = ax.bar(['Alcançado', 'Meta'], [dados, meta], color=[cor, '#e74c3c'], alpha=0.8)
@@ -1692,13 +1694,11 @@ def criar_grafico_barras_word(dados, meta, titulo, cor="#2ecc71"):
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
     plt.close()
-    
-    return f'<img src="data:image/png;base64,{img_base64}" style="width:100%;max-width:500px;">'
+    return buf
 
 def criar_grafico_radar_word(analista, dados):
-    """Cria um gráfico radar para o relatório Word"""
+    """Cria gráfico radar e retorna buffer de imagem"""
     categorias = ['CSAT', 'Avaliações', 'Envio']
     valores = [dados['csat'], dados['perc_avaliacoes'], dados['perc_envio']]
     metas = [dados['meta_csat'], dados['meta_geral'], 80]
@@ -1727,13 +1727,11 @@ def criar_grafico_radar_word(analista, dados):
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
     plt.close()
-    
-    return f'<img src="data:image/png;base64,{img_base64}" style="width:100%;max-width:450px;">'
+    return buf
 
 def criar_grafico_evolucao_word(df_analista, analista, meta_csat, meta_avaliacoes):
-    """Cria um gráfico de evolução para o relatório Word"""
+    """Cria gráfico de evolução e retorna buffer de imagem"""
     if df_analista is None or df_analista.empty:
         return None
     
@@ -1761,18 +1759,16 @@ def criar_grafico_evolucao_word(df_analista, analista, meta_csat, meta_avaliacoe
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
     plt.close()
-    
-    return f'<img src="data:image/png;base64,{img_base64}" style="width:100%;max-width:600px;">'
+    return buf
 
 # ============================================
-# GERADOR DE RELATÓRIO WORD COM GRÁFICOS
+# GERADOR DE RELATÓRIO WORD COM GRÁFICOS (CORRIGIDO)
 # ============================================
 
 def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback, 
                                   media_operacao, podio, periodo, df_historico_analista=None):
-    """Gera relatório Word COMPLETO com gráficos"""
+    """Gera relatório Word COMPLETO com gráficos inseridos como imagens"""
     
     doc = Document()
     
@@ -1784,6 +1780,7 @@ def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback,
     
     doc.add_paragraph('')
     
+    # ===== RESULTADOS =====
     doc.add_heading('📋 Resultados do Período', level=1)
     
     table = doc.add_table(rows=5, cols=4)
@@ -1807,35 +1804,39 @@ def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback,
     
     doc.add_paragraph('')
     
+    # ===== GRÁFICOS =====
     doc.add_heading('📊 Gráficos de Performance', level=1)
     
-    html_csat = criar_grafico_barras_word(
-        dados['csat'], 
-        dados['meta_csat'], 
-        'CSAT - Resultado vs Meta'
-    )
-    doc.add_paragraph('CSAT: Resultado vs Meta')
-    doc.add_paragraph(html_csat)
-    doc.add_paragraph('')
+    # Gráfico de barras
+    img_buffer = criar_grafico_barras_word(dados['csat'], dados['meta_csat'], 'CSAT - Resultado vs Meta')
+    if img_buffer:
+        doc.add_paragraph('CSAT: Resultado vs Meta')
+        doc.add_picture(img_buffer, width=Inches(5))
+        doc.add_paragraph('')
     
-    html_radar = criar_grafico_radar_word(analista, dados)
-    doc.add_paragraph('Radar de Performance')
-    doc.add_paragraph(html_radar)
-    doc.add_paragraph('')
+    # Gráfico radar
+    img_buffer = criar_grafico_radar_word(analista, dados)
+    if img_buffer:
+        doc.add_paragraph('Radar de Performance')
+        doc.add_picture(img_buffer, width=Inches(4.5))
+        doc.add_paragraph('')
     
+    # Gráfico de evolução (se houver dados)
     if df_historico_analista is not None and not df_historico_analista.empty and len(df_historico_analista['mes_ano'].unique()) >= 2:
-        html_evolucao = criar_grafico_evolucao_word(
+        img_buffer = criar_grafico_evolucao_word(
             df_historico_analista,
             analista,
             dados['meta_csat'],
             dados['meta_geral']
         )
-        if html_evolucao:
+        if img_buffer:
             doc.add_paragraph('Evolução Mensal')
-            doc.add_paragraph(html_evolucao)
+            doc.add_picture(img_buffer, width=Inches(6))
+            doc.add_paragraph('')
     
     doc.add_page_break()
     
+    # ===== ANÁLISE TÉCNICA =====
     doc.add_heading('📝 Análise Técnica de Desempenho', level=1)
     
     for linha in analise_tecnica.split('\n'):
@@ -1873,7 +1874,7 @@ def gerar_relatorio_completo_word(analista, dados, analise_tecnica, feedback,
     return buffer
 
 # ============================================
-# RADAR IMPACTANTE
+# RADAR IMPACTANTE (mantido)
 # ============================================
 
 def criar_radar_impactante(analista, dados):
@@ -1967,7 +1968,7 @@ def criar_radar_impactante(analista, dados):
     return fig
 
 # ============================================
-# FUNCOES DE FEEDBACK
+# FUNCOES DE FEEDBACK (mantidas)
 # ============================================
 
 def gerar_analise_tecnica(analista, dados, media_operacao, podio):
@@ -2275,7 +2276,7 @@ Gere o feedback:
 """
 
 # ============================================
-# DASHBOARD GESTOR - VERSÃO OTIMIZADA
+# DASHBOARD GESTOR - VERSÃO OTIMIZADA (com width='stretch')
 # ============================================
 
 def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
@@ -2757,7 +2758,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
             
             st.markdown("---")
             
-            # Análise Técnica
+            # Análise Técnica em expander
             with st.expander("📊 Análise Técnica de Desempenho", expanded=False):
                 analise_tecnica = gerar_analise_tecnica(
                     analista_selecionado,
@@ -2802,7 +2803,7 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                     data=relatorio_individual,
                     file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
+                    width='stretch'
                 )
             
             with col2:
@@ -2825,13 +2826,13 @@ def dashboard_gestor_otimizado(periodo, gestor_nome, supabase):
                     data=relatorio_completo,
                     file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
+                    width='stretch'
                 )
     
     return resultados
 
 # ============================================
-# DASHBOARD COORDENADOR - VERSÃO OTIMIZADA
+# DASHBOARD COORDENADOR - VERSÃO OTIMIZADA (com width='stretch')
 # ============================================
 
 def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
@@ -3278,7 +3279,7 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                     data=relatorio_individual,
                     file_name=f"Analise_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
+                    width='stretch'
                 )
             
             with col2:
@@ -3301,7 +3302,7 @@ def dashboard_coordenador_otimizado(periodo, nome_usuario, supabase):
                     data=relatorio_completo,
                     file_name=f"Relatorio_Completo_{analista_selecionado.replace(' ', '_')}_{periodo.replace(' ', '_')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
+                    width='stretch'
                 )
     
     return resultados
@@ -3909,7 +3910,7 @@ def main():
         pagina_configuracoes()
     
     st.markdown("---")
-    st.markdown('<div style="text-align: center; color: var(--text-secondary, #666); font-size: 12px;">Sistema de Performance v15.0 | Versão Completa com Gráficos nos Relatórios</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; color: var(--text-secondary, #666); font-size: 12px;">Sistema de Performance v15.0 | Versão Estável com Gráficos</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
