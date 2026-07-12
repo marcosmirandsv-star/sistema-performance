@@ -4,27 +4,74 @@ __pycache__/
 *$py.class
 *.so
 .Python
+*.pyc
+*.pyo
+*.pyd
 
-# Env
-.env
+# Distribuição / Build
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Ambiente Virtual
 venv/
 env/
 ENV/
+.venv
 
-# Streamlit
+# Variáveis de ambiente e senhas
+.env
 .streamlit/secrets.toml
 
-# IDE
+# ===== DADOS DO SISTEMA =====
+# NUNCA envie esses arquivos para o GitHub (contêm dados sensíveis)
+usuarios.json          # Usuários cadastrados (com senhas hash)
+analistas.json         # Configuração da equipe
+backup_sistema_*.xlsx  # Backups do sistema
+
+# ===== DADOS DE USUÁRIO =====
+# Os usuários fazem upload, não devem estar no repositório
+*.xlsx
+*.csv
+*.xls
+*.xlsm
+
+# ===== ARQUIVOS DE LOG =====
+*.log
+streamlit.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ===== CACHES =====
+.streamlit/cache/
+.streamlit/uploads/
+.cache/
+*.cache
+
+# ===== GRÁFICOS E IMAGENS GERADAS =====
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+
+# ===== EDITORES E IDE =====
 .vscode/
 .idea/
 *.swp
 *.swo
+*.swn
+*.bak
+*.tmp
 
-# OS
+# ===== SISTEMA OPERACIONAL =====
 .DS_Store
 Thumbs.db
+desktop.ini
+*.localized
 
-# Data
-*.xlsx
-*.csv
-*.xls
+# ===== ARQUIVOS TEMPORÁRIOS =====
+*.tmp
+*.temp
+*.~*
